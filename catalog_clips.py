@@ -27,7 +27,34 @@ def species_slug(common_name):
 
 
 def art_path(common_name):
+    """Path to the auto-generated watercolor (watercolors/<slug>.jpg)."""
     return os.path.join(ART_DIR, species_slug(common_name) + ".jpg")
+
+
+# Hand-made artwork (e.g. generated in ChatGPT) goes here and takes precedence
+# over the auto watercolor. Any of these extensions is accepted.
+CUSTOM_ART_DIR = os.path.join(HERE, "custom_art")
+ART_EXTS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def custom_art_path(common_name):
+    """Return the hand-made image for a species in custom_art/, or None."""
+    slug = species_slug(common_name)
+    for ext in ART_EXTS:
+        p = os.path.join(CUSTOM_ART_DIR, slug + ext)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def resolve_art_path(common_name):
+    """Best available artwork: a custom image if present, else the auto
+    watercolor, else None."""
+    custom = custom_art_path(common_name)
+    if custom:
+        return custom
+    auto = art_path(common_name)
+    return auto if os.path.exists(auto) else None
 
 
 def top_songs(entry, n=TOP_N):

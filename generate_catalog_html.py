@@ -55,17 +55,45 @@ def attach_top_clips(data):
     return out
 
 
-def attach_art(data):
-    """Embed each species' cached watercolor (watercolors/<slug>.jpg) as a
-    base64 JPEG data URI on the entry as `art` (None if no cached artwork)."""
-    for entry in data.get("species", {}).values():
-        path = cc.art_path(entry.get("common_name"))
-        if os.path.exists(path):
-            with open(path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode("ascii")
-            entry["art"] = "data:image/jpeg;base64," + b64
+ART_EMBED_MAX_W = 560  # px; source images are downscaled to keep the page small
+
+
+def _embed_art(path):
+    """Normalize any source image (a hand-made custom_art/ file or the auto
+    watercolor) to a modestly-sized JPEG on white and return a base64 data URI.
+    Falls back to embedding the raw bytes if Pillow processing fails."""
+    try:
+        import io
+        from PIL import Image
+        img = Image.open(path)
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGBA")
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])  # flatten transparency onto white
+            img = bg
         else:
-            entry["art"] = None
+            img = img.convert("RGB")
+        w, h = img.size
+        if w > ART_EMBED_MAX_W:
+            img = img.resize((ART_EMBED_MAX_W, max(1, int(h * ART_EMBED_MAX_W / w))))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=88, optimize=True)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return "data:image/jpeg;base64," + b64
+    except Exception:
+        import mimetypes
+        mime = mimetypes.guess_type(path)[0] or "image/jpeg"
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return "data:" + mime + ";base64," + b64
+
+
+def attach_art(data):
+    """Embed each species' best artwork (custom_art/ preferred, else the auto
+    watercolor) as a base64 data URI on the entry as `art` (None if neither)."""
+    for entry in data.get("species", {}).values():
+        path = cc.resolve_art_path(entry.get("common_name"))
+        entry["art"] = _embed_art(path) if path else None
     return data
 
 PAGE_TEMPLATE = """<!DOCTYPE html>

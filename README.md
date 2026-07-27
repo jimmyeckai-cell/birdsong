@@ -61,6 +61,23 @@ catalog data is embedded, so it works opened directly or hosted anywhere).
   provenance still syncs. If you want the audio on another machine, copy it via
   cloud storage or an external drive.
 
+## Custom bird artwork (e.g. from ChatGPT)
+
+The mural uses an auto-generated watercolor for each bird by default, but you can
+override any bird with your own image (such as a ChatGPT-generated watercolor):
+
+1. Run `./venv/bin/python art_status.py` to see the exact filename for each
+   species (and which still use the auto watercolor).
+2. Generate the image using the prompt in `ART_STYLE_PROMPT.md` (attach a
+   reference photo for accuracy).
+3. Save it in `custom_art/` with that filename, e.g.
+   `custom_art/American_Robin.png` (PNG/JPG/JPEG/WEBP all accepted).
+4. Rebuild: `./venv/bin/python generate_catalog_html.py` (or `./save.sh`).
+
+Custom images take precedence over the auto watercolors and are downscaled to
+~560px JPEG on embed, so the page stays small no matter how large the source is.
+`custom_art/` is committed, so your artwork syncs across machines.
+
 ## Syncing across two (or more) machines
 
 The catalog data and generated page are committed to git, so GitHub is the
