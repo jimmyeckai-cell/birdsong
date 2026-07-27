@@ -16,6 +16,10 @@ birdnetlib==0.18.1
 librosa==0.11.0
 tensorflow==2.20.0
 
+# Watercolor bird portraits for the landing page (fetch_watercolors.py):
+# Pillow ships with tensorflow's deps; opencv provides the painterly filters.
+opencv-python-headless==5.0.0.93
+
 # --- Alternative TFLite backend (Linux aarch64 etc.); requires numpy<2 ---
 # tflite-runtime==2.14.0
 # numpy==1.26.4

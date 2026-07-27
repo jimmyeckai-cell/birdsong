@@ -50,17 +50,17 @@ def attach_top_clips(data):
     return out
 
 
-def attach_sketches(data):
-    """Embed each species' cached pencil sketch (sketches/<slug>.png) as a
-    base64 PNG data URI on the entry as `sketch` (None if no cached sketch)."""
+def attach_art(data):
+    """Embed each species' cached watercolor (watercolors/<slug>.jpg) as a
+    base64 JPEG data URI on the entry as `art` (None if no cached artwork)."""
     for entry in data.get("species", {}).values():
-        path = cc.sketch_path(entry.get("common_name"))
+        path = cc.art_path(entry.get("common_name"))
         if os.path.exists(path):
             with open(path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode("ascii")
-            entry["sketch"] = "data:image/png;base64," + b64
+            entry["art"] = "data:image/jpeg;base64," + b64
         else:
-            entry["sketch"] = None
+            entry["art"] = None
     return data
 
 PAGE_TEMPLATE = """<!DOCTYPE html>
@@ -97,6 +97,43 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
   }
   #search:focus { outline: none; border-color: var(--accent); }
+
+  [hidden] { display: none !important; }
+
+  /* Landing view — minimal watercolor gallery */
+  #view-landing { min-height: 100vh; padding: 54px 24px 130px; }
+  .gallery {
+    max-width: 1120px; margin: 0 auto; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 42px 30px;
+  }
+  .art-item { text-align: center; }
+  .art-item img { width: 100%; height: auto; display: block; }
+  .art-item .art-name {
+    margin-top: 8px; font-size: 0.78rem; font-weight: 400; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #6b7b72;
+  }
+  .art-item img.fallback { width: 45%; margin: 0 auto; opacity: .35; }
+  .explore-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
+    padding: 22px; pointer-events: none;
+    background: linear-gradient(to top, rgba(255,255,255,.96) 40%, rgba(255,255,255,0));
+  }
+  .explore-btn {
+    pointer-events: auto; background: var(--accent); color: #fff; border: none;
+    border-radius: 999px; padding: 14px 32px; font-size: 0.95rem; letter-spacing: 0.04em;
+    cursor: pointer; box-shadow: 0 6px 20px rgba(46,125,70,.35);
+    transition: transform .12s ease, background .12s ease;
+  }
+  .explore-btn:hover { transform: translateY(-2px); background: #26683a; }
+
+  /* Explore view */
+  header { position: relative; }
+  .back-btn {
+    position: absolute; top: 16px; left: 16px; background: var(--panel2);
+    border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+    padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* Bird sketch grid */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px; }
@@ -175,24 +212,37 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<header>
-  <h1>&#127925; Bird Song Catalog</h1>
-  <p>Hover a bird for details &middot; click it to hear its best song</p>
-  <div class="stats">
-    <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
-    <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Sessions</div></div>
-    <div class="stat"><div class="num" id="stat-songs">0</div><div class="lbl">Songs</div></div>
-    <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
+
+<!-- ============ LANDING VIEW (minimal watercolor gallery) ============ -->
+<section id="view-landing" class="view">
+  <div class="gallery" id="gallery"></div>
+  <div class="explore-bar">
+    <button id="go-explore" class="explore-btn">Explore database</button>
   </div>
-</header>
-<main>
-  <div class="search-wrap">
-    <input id="search" type="search" placeholder="Search species by name..." autocomplete="off">
-  </div>
-  <div class="grid" id="grid"></div>
-  <div class="empty" id="empty" style="display:none">No species match your search.</div>
-</main>
-<footer>Generated from bird_catalog_data.json &middot; Sketches &amp; facts from Wikipedia</footer>
+</section>
+
+<!-- ================ EXPLORE VIEW (full catalog) ==================== -->
+<section id="view-explore" class="view" hidden>
+  <header>
+    <button id="go-back" class="back-btn">&larr; Back</button>
+    <h1>&#127925; Bird Song Catalog</h1>
+    <p>Hover a bird for details &middot; click it to hear its best song</p>
+    <div class="stats">
+      <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
+      <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Sessions</div></div>
+      <div class="stat"><div class="num" id="stat-songs">0</div><div class="lbl">Songs</div></div>
+      <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
+    </div>
+  </header>
+  <main>
+    <div class="search-wrap">
+      <input id="search" type="search" placeholder="Search species by name..." autocomplete="off">
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none">No species match your search.</div>
+  </main>
+  <footer>Generated from bird_catalog_data.json &middot; Watercolors &amp; facts from Wikipedia</footer>
+</section>
 
 <div class="overlay" id="overlay">
   <div class="modal" id="modal">
@@ -363,9 +413,9 @@ function renderGrid(filter) {
     wrap.className = 'sketch-wrap';
 
     const img = document.createElement('img');
-    img.className = 'sketch' + (sp.sketch ? '' : ' fallback');
-    img.src = sp.sketch || FALLBACK_SKETCH;
-    img.alt = sp.common_name + ' sketch';
+    img.className = 'sketch' + (sp.art ? '' : ' fallback');
+    img.src = sp.art || FALLBACK_SKETCH;
+    img.alt = sp.common_name;
     img.loading = 'lazy';
     wrap.appendChild(img);
 
@@ -496,15 +546,53 @@ function fetchWiki(name, container) {
 
 function closeModal() { document.getElementById('overlay').classList.remove('open'); }
 
+// ---- Landing gallery (minimal watercolor portraits) ----
+function renderGallery() {
+  const gallery = document.getElementById('gallery');
+  gallery.innerHTML = '';
+  for (const sp of speciesList) {
+    const item = document.createElement('div');
+    item.className = 'art-item';
+    const img = document.createElement('img');
+    if (!sp.art) img.className = 'fallback';
+    img.src = sp.art || FALLBACK_SKETCH;
+    img.alt = sp.common_name;
+    img.loading = 'lazy';
+    const name = document.createElement('div');
+    name.className = 'art-name';
+    name.textContent = sp.common_name;
+    item.appendChild(img);
+    item.appendChild(name);
+    gallery.appendChild(item);
+  }
+}
+
+// ---- View switching (landing <-> explore) ----
+let exploreRendered = false;
+function showExplore() {
+  if (!exploreRendered) { computeStats(); renderGrid(''); exploreRendered = true; }
+  document.getElementById('view-landing').hidden = true;
+  document.getElementById('view-explore').hidden = false;
+  window.scrollTo(0, 0);
+}
+function showLanding() {
+  stopCurrent();
+  closeModal();
+  document.getElementById('view-explore').hidden = true;
+  document.getElementById('view-landing').hidden = false;
+  window.scrollTo(0, 0);
+}
+
 document.getElementById('close').addEventListener('click', closeModal);
 document.getElementById('overlay').addEventListener('click', e => {
   if (e.target.id === 'overlay') closeModal();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 document.getElementById('search').addEventListener('input', e => renderGrid(e.target.value));
+document.getElementById('go-explore').addEventListener('click', showExplore);
+document.getElementById('go-back').addEventListener('click', showLanding);
 
-computeStats();
-renderGrid('');
+renderGallery();
 </script>
 </body>
 </html>
@@ -520,9 +608,9 @@ def main():
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Attach top-song clips (embedded audio) and pencil sketches for the page.
+    # Attach top-song clips (embedded audio) and watercolor art for the page.
     augmented = attach_top_clips(data)
-    attach_sketches(augmented)
+    attach_art(augmented)
 
     # Embed the JSON as a JS object literal. json.dumps is valid JS; escape
     # </script> so the payload can't break out of the <script> block.
