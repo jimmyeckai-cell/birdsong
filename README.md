@@ -78,6 +78,26 @@ Custom images take precedence over the auto watercolors and are downscaled to
 ~560px JPEG on embed, so the page stays small no matter how large the source is.
 `custom_art/` is committed, so your artwork syncs across machines.
 
+### Auto-generating art via the OpenAI API
+
+`generate_art_openai.py` can fill `custom_art/` automatically: for each bird it
+fetches the Wikipedia photo and asks `gpt-image-1` to repaint it as a watercolor.
+
+**This uses the OpenAI Platform API, billed per image — a separate account and
+key from a ChatGPT Pro subscription.** Set a key first:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+./venv/bin/python generate_art_openai.py --dry-run   # show plan + rough cost, no calls
+./venv/bin/python generate_art_openai.py             # generate mural birds missing art
+./venv/bin/python generate_catalog_html.py           # rebuild the page (or ./save.sh)
+```
+
+Useful flags: `--all` (every species, not just the mural), `--force`
+(regenerate existing), `--quality low|medium|high`, `--limit N` (cap cost),
+`--text-only` (skip the reference photo). Rough cost per 1024² image: low
+~$0.02, medium ~$0.04, high ~$0.17.
+
 ## Syncing across two (or more) machines
 
 The catalog data and generated page are committed to git, so GitHub is the

@@ -20,6 +20,11 @@ tensorflow==2.20.0
 # Pillow ships with tensorflow's deps; opencv provides the painterly filters.
 opencv-python-headless==5.0.0.93
 
+# Optional: auto-generate watercolor art via the OpenAI Images API
+# (generate_art_openai.py). Needs an OPENAI_API_KEY (platform.openai.com,
+# billed per image) — this is NOT the same as a ChatGPT Pro subscription.
+openai>=1.0
+
 # --- Alternative TFLite backend (Linux aarch64 etc.); requires numpy<2 ---
 # tflite-runtime==2.14.0
 # numpy==1.26.4
