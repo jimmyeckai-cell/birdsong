@@ -135,13 +135,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   .explore-btn:hover { transform: translateY(-2px); background: #26683a; }
 
   /* Explore view */
-  header { position: relative; }
-  .back-btn {
-    position: absolute; top: 16px; left: 16px; background: var(--panel2);
-    border: 1px solid var(--border); color: var(--text); border-radius: 8px;
-    padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
-  }
-  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #view-explore { padding-bottom: 110px; }
 
   /* Bird sketch grid */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px; }
@@ -236,7 +230,6 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <!-- ================ EXPLORE VIEW (full catalog) ==================== -->
 <section id="view-explore" class="view" hidden>
   <header>
-    <button id="go-back" class="back-btn">&larr; Back</button>
     <h1>&#127925; Bird Song Catalog</h1>
     <p>Hover a bird for details &middot; click it to hear its best song</p>
     <div class="stats">
@@ -254,6 +247,9 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <div class="empty" id="empty" style="display:none">No species match your search.</div>
   </main>
   <footer>Generated from bird_catalog_data.json &middot; Watercolors &amp; facts from Wikipedia</footer>
+  <div class="explore-bar">
+    <button id="go-mural" class="explore-btn">Explore mural</button>
+  </div>
 </section>
 
 <div class="overlay" id="overlay">
@@ -615,7 +611,7 @@ document.getElementById('overlay').addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 document.getElementById('search').addEventListener('input', e => renderGrid(e.target.value));
 document.getElementById('go-explore').addEventListener('click', showExplore);
-document.getElementById('go-back').addEventListener('click', showLanding);
+document.getElementById('go-mural').addEventListener('click', showLanding);
 
 renderGallery();
 </script>
