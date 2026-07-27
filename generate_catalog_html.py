@@ -75,7 +75,9 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     color: var(--muted); font-size: 1.6rem; cursor: pointer; line-height: 1;
   }
   .modal h2 { margin: 0 0 2px; padding-right: 30px; }
-  .modal .sci { font-style: italic; color: var(--muted); margin: 0 0 16px; }
+  .modal .sci { font-style: italic; color: var(--muted); margin: 0 0 10px; }
+  .modal .summary { margin: 0 0 16px; font-size: 0.9rem; color: var(--text); }
+  .modal .summary b { color: var(--accent); }
   .wiki { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
   .wiki img { width: 180px; max-width: 100%; border-radius: 10px; object-fit: cover; background: var(--panel2); }
   .wiki .desc { flex: 1; min-width: 200px; color: var(--text); font-size: 0.92rem; }
@@ -95,7 +97,8 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <p>Species detected from field audio recordings</p>
   <div class="stats">
     <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
-    <div class="stat"><div class="num" id="stat-sightings">0</div><div class="lbl">Sightings</div></div>
+    <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Sessions</div></div>
+    <div class="stat"><div class="num" id="stat-songs">0</div><div class="lbl">Songs</div></div>
     <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
   </div>
 </header>
@@ -113,12 +116,13 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <button class="close" id="close" aria-label="Close">&times;</button>
     <h2 id="m-name"></h2>
     <p class="sci" id="m-sci"></p>
+    <p class="summary" id="m-summary"></p>
     <div class="wiki" id="m-wiki"></div>
-    <h3 style="margin:0 0 8px">Sightings</h3>
+    <h3 style="margin:0 0 8px">Sessions</h3>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Location</th><th>Date</th><th>Confidence</th><th>Recording</th></tr></thead>
-        <tbody id="m-sightings"></tbody>
+        <thead><tr><th>Location</th><th>Date</th><th>Recording</th><th>Songs</th><th>Highest</th><th>Avg</th></tr></thead>
+        <tbody id="m-sessions"></tbody>
       </table>
     </div>
   </div>
@@ -131,19 +135,43 @@ const CATALOG = __CATALOG_JSON__;
 const speciesList = Object.values(CATALOG.species || {}).sort(
   (a, b) => a.common_name.localeCompare(b.common_name));
 
+function sessionsOf(sp) { return sp.sessions || []; }
+function songsOf(session) { return session.songs || []; }
+function allSongs(sp) {
+  const out = [];
+  for (const s of sessionsOf(sp)) for (const g of songsOf(s)) out.push(g);
+  return out;
+}
+// {high, avg} confidence (0-1) over a list of songs, or null if empty.
+function confStats(songs) {
+  if (!songs.length) return null;
+  let high = 0, sum = 0;
+  for (const g of songs) {
+    const c = g.confidence || 0;
+    if (c > high) high = c;
+    sum += c;
+  }
+  return { high: high, avg: sum / songs.length };
+}
+function pct(x) { return Math.round(x * 100) + '%'; }
+
 function computeStats() {
-  let sightings = 0; const locs = new Set();
+  let sessions = 0, songs = 0; const locs = new Set();
   for (const sp of speciesList) {
-    sightings += (sp.sightings || []).length;
-    for (const s of (sp.sightings || [])) locs.add(s.location);
+    for (const sess of sessionsOf(sp)) {
+      sessions++;
+      songs += songsOf(sess).length;
+      locs.add(sess.location);
+    }
   }
   document.getElementById('stat-species').textContent = speciesList.length;
-  document.getElementById('stat-sightings').textContent = sightings;
+  document.getElementById('stat-sessions').textContent = sessions;
+  document.getElementById('stat-songs').textContent = songs;
   document.getElementById('stat-locations').textContent = locs.size;
 }
 
 function locationSummary(sp) {
-  const locs = [...new Set((sp.sightings || []).map(s => s.location))];
+  const locs = [...new Set(sessionsOf(sp).map(s => s.location))];
   if (locs.length <= 2) return locs.join(', ');
   return locs.slice(0, 2).join(', ') + ' +' + (locs.length - 2);
 }
@@ -160,13 +188,16 @@ function renderGrid(filter) {
     shown++;
     const card = document.createElement('div');
     card.className = 'card';
-    const count = (sp.sightings || []).length;
+    const nSessions = sessionsOf(sp).length;
+    const nSongs = allSongs(sp).length;
     card.innerHTML =
       '<h3></h3><p class="sci"></p>' +
       '<div class="meta"><span class="badge"></span><span class="locs"></span></div>';
     card.querySelector('h3').textContent = sp.common_name;
     card.querySelector('.sci').textContent = sp.scientific_name || '';
-    card.querySelector('.badge').textContent = count + (count === 1 ? ' sighting' : ' sightings');
+    card.querySelector('.badge').textContent =
+      nSessions + (nSessions === 1 ? ' session' : ' sessions') +
+      ' · ' + nSongs + (nSongs === 1 ? ' song' : ' songs');
     card.querySelector('.locs').textContent = locationSummary(sp);
     card.addEventListener('click', () => openModal(sp));
     grid.appendChild(card);
@@ -178,15 +209,38 @@ function openModal(sp) {
   document.getElementById('m-name').textContent = sp.common_name;
   document.getElementById('m-sci').textContent = sp.scientific_name || '';
 
-  const tbody = document.getElementById('m-sightings');
+  // Species-level confidence summary across all sessions.
+  const sessions = sessionsOf(sp);
+  const overall = confStats(allSongs(sp));
+  const nSongs = allSongs(sp).length;
+  const summary = document.getElementById('m-summary');
+  if (overall) {
+    summary.innerHTML =
+      'Heard in <b>' + sessions.length + '</b> session' +
+      (sessions.length === 1 ? '' : 's') + ' · <b>' + nSongs + '</b> song' +
+      (nSongs === 1 ? '' : 's') + ' · highest confidence <b>' +
+      pct(overall.high) + '</b> · average <b>' + pct(overall.avg) + '</b>';
+  } else {
+    summary.textContent = '';
+  }
+
+  const tbody = document.getElementById('m-sessions');
   tbody.innerHTML = '';
-  const sightings = (sp.sightings || []).slice().sort((a, b) =>
+  const rows = sessions.slice().sort((a, b) =>
     (b.date || '').localeCompare(a.date || ''));
-  for (const s of sightings) {
+  for (const sess of rows) {
+    const songs = songsOf(sess);
+    const st = confStats(songs);
     const tr = document.createElement('tr');
-    const conf = s.confidence != null ? Math.round(s.confidence * 100) + '%' : '-';
-    for (const [cls, val] of [['', s.location], ['', s.date],
-        ['conf', conf], ['', s.recording_file || '-']]) {
+    const cells = [
+      ['', sess.location],
+      ['', sess.date],
+      ['', sess.recording_file || '-'],
+      ['', String(songs.length)],
+      ['conf', st ? pct(st.high) : '-'],
+      ['conf', st ? pct(st.avg) : '-'],
+    ];
+    for (const [cls, val] of cells) {
       const td = document.createElement('td');
       if (cls) td.className = cls;
       td.textContent = val || '-';
