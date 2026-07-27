@@ -9,10 +9,45 @@ Usage:
         [--out bird_catalog.html]
 """
 import argparse
+import base64
+import copy
 import json
 import os
 
+import catalog_clips as cc
+
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def attach_top_clips(data):
+    """Return a deep copy of the catalog with each species' top songs (and their
+    embedded base64 OGG audio, when a cached clip exists) attached as
+    `top_clips`. The audio is embedded only in the HTML, never written back to
+    bird_catalog_data.json, which stays audio-free."""
+    out = copy.deepcopy(data)
+    for entry in out.get("species", {}).values():
+        clips = []
+        for song in cc.top_songs(entry):
+            start = song.get("start_time_sec")
+            end = song.get("end_time_sec")
+            audio = None
+            if start is not None and end is not None:
+                path = cc.clip_path(cc.clip_id(song["recording_file"], start, end))
+                if os.path.exists(path):
+                    with open(path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("ascii")
+                    audio = "data:audio/ogg;base64," + b64
+            clips.append({
+                "confidence": song.get("confidence"),
+                "recording_file": song.get("recording_file"),
+                "location": song.get("location"),
+                "date": song.get("date"),
+                "start_time_sec": start,
+                "end_time_sec": end,
+                "audio": audio,
+            })
+        entry["top_clips"] = clips
+    return out
 
 PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -78,6 +113,14 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   .modal .sci { font-style: italic; color: var(--muted); margin: 0 0 10px; }
   .modal .summary { margin: 0 0 16px; font-size: 0.9rem; color: var(--text); }
   .modal .summary b { color: var(--accent); }
+  #m-clips-wrap { margin-bottom: 20px; }
+  .clip { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .clip:last-child { border-bottom: none; }
+  .clip .rank { color: var(--accent); font-weight: 700; }
+  .clip .clip-meta { font-size: 0.82rem; color: var(--muted); min-width: 170px; flex: 1; }
+  .clip .clip-meta b { color: var(--accent); }
+  .clip audio { height: 34px; max-width: 100%; }
+  .clip .noaudio { font-style: italic; color: var(--muted); font-size: 0.82rem; }
   .wiki { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
   .wiki img { width: 180px; max-width: 100%; border-radius: 10px; object-fit: cover; background: var(--panel2); }
   .wiki .desc { flex: 1; min-width: 200px; color: var(--text); font-size: 0.92rem; }
@@ -118,6 +161,10 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <p class="sci" id="m-sci"></p>
     <p class="summary" id="m-summary"></p>
     <div class="wiki" id="m-wiki"></div>
+    <div id="m-clips-wrap" style="display:none">
+      <h3 style="margin:0 0 8px">Top songs</h3>
+      <div id="m-clips"></div>
+    </div>
     <h3 style="margin:0 0 8px">Sessions</h3>
     <div class="table-scroll">
       <table>
@@ -154,6 +201,51 @@ function confStats(songs) {
   return { high: high, avg: sum / songs.length };
 }
 function pct(x) { return Math.round(x * 100) + '%'; }
+function fmtTime(sec) {
+  if (sec == null) return '?';
+  const s = Math.floor(sec % 60), m = Math.floor(sec / 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function renderClips(sp) {
+  const wrap = document.getElementById('m-clips-wrap');
+  const box = document.getElementById('m-clips');
+  box.innerHTML = '';
+  const clips = sp.top_clips || [];
+  if (!clips.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  clips.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'clip';
+
+    const rank = document.createElement('span');
+    rank.className = 'rank';
+    rank.textContent = '#' + (i + 1);
+    row.appendChild(rank);
+
+    const meta = document.createElement('span');
+    meta.className = 'clip-meta';
+    const conf = c.confidence != null ? pct(c.confidence) : '-';
+    meta.innerHTML = '<b>' + conf + '</b> · ' + fmtTime(c.start_time_sec) +
+      '–' + fmtTime(c.end_time_sec) + ' · ' + (c.location || '') +
+      ' · ' + (c.recording_file || '');
+    row.appendChild(meta);
+
+    if (c.audio) {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.preload = 'none';
+      audio.src = c.audio;
+      row.appendChild(audio);
+    } else {
+      const na = document.createElement('span');
+      na.className = 'noaudio';
+      na.textContent = '(audio not available on this machine)';
+      row.appendChild(na);
+    }
+    box.appendChild(row);
+  });
+}
 
 function computeStats() {
   let sessions = 0, songs = 0; const locs = new Set();
@@ -249,6 +341,8 @@ function openModal(sp) {
     tbody.appendChild(tr);
   }
 
+  renderClips(sp);
+
   const wiki = document.getElementById('m-wiki');
   wiki.innerHTML = '<p class="loading">Loading photo and facts from Wikipedia...</p>';
   fetchWiki(sp.common_name, wiki);
@@ -318,16 +412,26 @@ def main():
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
+    # Attach top-song clips (with embedded audio) for the page only.
+    augmented = attach_top_clips(data)
+
     # Embed the JSON as a JS object literal. json.dumps is valid JS; escape
     # </script> so the payload can't break out of the <script> block.
-    embedded = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    embedded = json.dumps(augmented, ensure_ascii=False).replace("</", "<\\/")
     html = PAGE_TEMPLATE.replace("__CATALOG_JSON__", embedded)
 
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(html)
 
     n_species = len(data.get("species", {}))
-    print(f"Wrote {args.out} ({n_species} species).")
+    with_audio = sum(
+        1 for e in augmented.get("species", {}).values()
+        for c in e.get("top_clips", []) if c.get("audio"))
+    total_clips = sum(
+        len(e.get("top_clips", [])) for e in augmented.get("species", {}).values())
+    size_kb = os.path.getsize(args.out) / 1024
+    print(f"Wrote {args.out} ({n_species} species, {with_audio}/{total_clips} "
+          f"top-song clips with audio embedded, {size_kb:.0f} KB).")
 
 
 if __name__ == "__main__":

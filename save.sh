@@ -9,7 +9,11 @@ cd "$(dirname "$0")"
 PY=./venv/bin/python
 [ -x "$PY" ] || PY=python3
 
-# 1. Always regenerate the page so bird_catalog.html matches the JSON.
+# 1. Extract any new top-song clips (needs the source recording locally; songs
+#    whose recording isn't on this machine are skipped), then regenerate the
+#    page so bird_catalog.html matches the JSON.
+echo "Extracting top-song clips..."
+"$PY" extract_clips.py
 echo "Regenerating bird_catalog.html..."
 "$PY" generate_catalog_html.py
 
