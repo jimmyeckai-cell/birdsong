@@ -49,6 +49,20 @@ def attach_top_clips(data):
         entry["top_clips"] = clips
     return out
 
+
+def attach_sketches(data):
+    """Embed each species' cached pencil sketch (sketches/<slug>.png) as a
+    base64 PNG data URI on the entry as `sketch` (None if no cached sketch)."""
+    for entry in data.get("species", {}).values():
+        path = cc.sketch_path(entry.get("common_name"))
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            entry["sketch"] = "data:image/png;base64," + b64
+        else:
+            entry["sketch"] = None
+    return data
+
 PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,8 +71,8 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <title>Bird Song Catalog</title>
 <style>
   :root {
-    --bg: #0f1720; --panel: #17212b; --panel2: #1e2b38;
-    --text: #e7edf3; --muted: #9fb0c0; --accent: #6bd08a; --border: #2a3a49;
+    --bg: #ffffff; --panel: #ffffff; --panel2: #f3f6f4;
+    --text: #1b2a22; --muted: #6b7b72; --accent: #2e7d46; --border: #e3e9e5;
   }
   * { box-sizing: border-box; }
   body {
@@ -67,43 +81,69 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     line-height: 1.5;
   }
   header {
-    padding: 32px 20px 20px; text-align: center;
-    background: linear-gradient(160deg, #1b2a1f, #0f1720);
-    border-bottom: 1px solid var(--border);
+    padding: 36px 20px 22px; text-align: center;
+    background: var(--bg); border-bottom: 1px solid var(--border);
   }
-  header h1 { margin: 0 0 6px; font-size: 2rem; }
+  header h1 { margin: 0 0 6px; font-size: 2rem; letter-spacing: -0.01em; }
   header p { margin: 0; color: var(--muted); }
-  .stats { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
-  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 18px; min-width: 90px; }
+  .stats { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .stat { background: var(--panel2); border-radius: 10px; padding: 10px 18px; min-width: 88px; }
   .stat .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
-  .stat .lbl { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
-  .search-wrap { margin: 0 auto 24px; max-width: 480px; }
+  .stat .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 20px 60px; }
+  .search-wrap { margin: 0 auto 26px; max-width: 460px; }
   #search {
     width: 100%; padding: 12px 16px; font-size: 1rem; border-radius: 10px;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
   }
   #search:focus { outline: none; border-color: var(--accent); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    padding: 16px; cursor: pointer; transition: transform .1s ease, border-color .1s ease;
+
+  /* Bird sketch grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px; }
+  .bird { cursor: pointer; text-align: center; }
+  .sketch-wrap {
+    position: relative; background: #fff; border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
   }
-  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
-  .card h3 { margin: 0 0 4px; font-size: 1.1rem; }
-  .card .sci { margin: 0 0 10px; font-style: italic; color: var(--muted); font-size: 0.85rem; }
-  .card .meta { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); }
-  .card .badge { background: var(--panel2); border-radius: 20px; padding: 2px 10px; color: var(--accent); font-weight: 600; }
+  .bird:hover .sketch-wrap { box-shadow: 0 8px 22px rgba(0,0,0,.10); transform: translateY(-3px); border-color: #cfe0d5; }
+  .bird.playing .sketch-wrap { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .sketch { max-width: 88%; max-height: 88%; object-fit: contain; }
+  .sketch.fallback { width: 45%; height: 45%; opacity: .35; }
+  .bird-name { margin-top: 10px; font-weight: 600; font-size: 0.95rem; }
+  .bird-sci { font-style: italic; color: var(--muted); font-size: 0.8rem; }
+
+  /* Hover info overlay on each sketch */
+  .hoverinfo {
+    position: absolute; inset: 0; background: rgba(255,255,255,.95);
+    padding: 14px; display: flex; flex-direction: column; justify-content: center;
+    gap: 4px; opacity: 0; pointer-events: none; transition: opacity .15s ease;
+    text-align: left;
+  }
+  .bird:hover .hoverinfo { opacity: 1; pointer-events: auto; }
+  .hoverinfo .hi-name { font-weight: 700; font-size: 0.98rem; }
+  .hoverinfo .hi-sci { font-style: italic; color: var(--muted); font-size: 0.78rem; margin-bottom: 4px; }
+  .hoverinfo .hi-row { font-size: 0.8rem; color: var(--text); }
+  .hoverinfo .hi-row b { color: var(--accent); }
+  .hoverinfo .hi-play { margin-top: 8px; font-size: 0.82rem; color: var(--accent); font-weight: 600; }
+  .hoverinfo .hi-details {
+    margin-top: 6px; align-self: flex-start; background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; cursor: pointer;
+  }
+  .hoverinfo .hi-details:hover { border-color: var(--accent); color: var(--accent); }
   .empty { text-align: center; color: var(--muted); padding: 40px; }
+
   /* Modal */
   .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    position: fixed; inset: 0; background: rgba(20,30,25,.45); display: none;
     align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 10;
   }
   .overlay.open { display: flex; }
   .modal {
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
     max-width: 640px; width: 100%; padding: 24px; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
   }
   .modal .close {
     position: absolute; top: 12px; right: 14px; background: none; border: none;
@@ -137,7 +177,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <body>
 <header>
   <h1>&#127925; Bird Song Catalog</h1>
-  <p>Species detected from field audio recordings</p>
+  <p>Hover a bird for details &middot; click it to hear its best song</p>
   <div class="stats">
     <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
     <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Sessions</div></div>
@@ -152,7 +192,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">No species match your search.</div>
 </main>
-<footer>Generated from bird_catalog_data.json &middot; Photos &amp; facts from Wikipedia</footer>
+<footer>Generated from bird_catalog_data.json &middot; Sketches &amp; facts from Wikipedia</footer>
 
 <div class="overlay" id="overlay">
   <div class="modal" id="modal">
@@ -268,9 +308,41 @@ function locationSummary(sp) {
   return locs.slice(0, 2).join(', ') + ' +' + (locs.length - 2);
 }
 
+// Simple bird-silhouette fallback when a species has no cached sketch.
+const FALLBACK_SKETCH = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#8aa596">' +
+  '<path d="M22 6c-1 0-2 .5-2.5 1.4C18.8 5.4 16.6 4 14 4c-3.9 0-7 3.1-7 7 0 .3 0 .6.1.9' +
+  'C4.7 12.4 3 14.5 3 17c0 .6.4 1 1 1 2.5 0 4.6-1.7 5.1-4 .3 0 .6.1.9.1 3.9 0 7-3.1 7-7' +
+  ' 0-.4 0-.7-.1-1.1.6-.3 1.1-.9 1.4-1.6.3.1.5.1.7.1.6 0 1-.4 1-1s-.4-1-1-1z"/></svg>');
+
+// One shared player so a new click stops whatever was playing.
+let currentAudio = null;
+let currentBird = null;
+
+function stopCurrent() {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  if (currentBird) { currentBird.classList.remove('playing'); currentBird = null; }
+}
+
+function playTopSong(sp, birdEl) {
+  const clip = (sp.top_clips || [])[0];
+  // Clicking the currently-playing bird stops it (toggle).
+  if (currentBird === birdEl) { stopCurrent(); return; }
+  stopCurrent();
+  if (!clip || !clip.audio) return;   // no audio available
+  const audio = new Audio(clip.audio);
+  currentAudio = audio; currentBird = birdEl;
+  birdEl.classList.add('playing');
+  audio.addEventListener('ended', () => {
+    if (currentBird === birdEl) stopCurrent();
+  });
+  audio.play().catch(() => stopCurrent());
+}
+
 function renderGrid(filter) {
   const grid = document.getElementById('grid');
   const empty = document.getElementById('empty');
+  stopCurrent();
   grid.innerHTML = '';
   const f = (filter || '').trim().toLowerCase();
   let shown = 0;
@@ -278,21 +350,57 @@ function renderGrid(filter) {
     const hay = (sp.common_name + ' ' + (sp.scientific_name || '')).toLowerCase();
     if (f && !hay.includes(f)) continue;
     shown++;
-    const card = document.createElement('div');
-    card.className = 'card';
+
     const nSessions = sessionsOf(sp).length;
     const nSongs = allSongs(sp).length;
-    card.innerHTML =
-      '<h3></h3><p class="sci"></p>' +
-      '<div class="meta"><span class="badge"></span><span class="locs"></span></div>';
-    card.querySelector('h3').textContent = sp.common_name;
-    card.querySelector('.sci').textContent = sp.scientific_name || '';
-    card.querySelector('.badge').textContent =
-      nSessions + (nSessions === 1 ? ' session' : ' sessions') +
-      ' · ' + nSongs + (nSongs === 1 ? ' song' : ' songs');
-    card.querySelector('.locs').textContent = locationSummary(sp);
-    card.addEventListener('click', () => openModal(sp));
-    grid.appendChild(card);
+    const stats = confStats(allSongs(sp));
+    const hasAudio = !!((sp.top_clips || [])[0] || {}).audio;
+
+    const bird = document.createElement('div');
+    bird.className = 'bird';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'sketch-wrap';
+
+    const img = document.createElement('img');
+    img.className = 'sketch' + (sp.sketch ? '' : ' fallback');
+    img.src = sp.sketch || FALLBACK_SKETCH;
+    img.alt = sp.common_name + ' sketch';
+    img.loading = 'lazy';
+    wrap.appendChild(img);
+
+    // Hover info overlay.
+    const info = document.createElement('div');
+    info.className = 'hoverinfo';
+    const playLine = hasAudio ? '▶ Click to play top song'
+                              : '(no audio for this species yet)';
+    info.innerHTML =
+      '<div class="hi-name"></div><div class="hi-sci"></div>' +
+      '<div class="hi-row"><b>' + nSessions + '</b> session' + (nSessions === 1 ? '' : 's') +
+      ' · <b>' + nSongs + '</b> song' + (nSongs === 1 ? '' : 's') + '</div>' +
+      '<div class="hi-row">Top confidence <b>' + (stats ? pct(stats.high) : '-') + '</b></div>' +
+      '<div class="hi-row hi-loc"></div>' +
+      '<div class="hi-play">' + playLine + '</div>';
+    info.querySelector('.hi-name').textContent = sp.common_name;
+    info.querySelector('.hi-sci').textContent = sp.scientific_name || '';
+    info.querySelector('.hi-loc').textContent = locationSummary(sp);
+
+    const details = document.createElement('button');
+    details.className = 'hi-details';
+    details.textContent = 'Details ▸';
+    details.addEventListener('click', (e) => { e.stopPropagation(); openModal(sp); });
+    info.appendChild(details);
+    wrap.appendChild(info);
+
+    bird.appendChild(wrap);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'bird-name';
+    nameEl.textContent = sp.common_name;
+    bird.appendChild(nameEl);
+
+    bird.addEventListener('click', () => playTopSong(sp, bird));
+    grid.appendChild(bird);
   }
   empty.style.display = shown === 0 ? 'block' : 'none';
 }
@@ -412,8 +520,9 @@ def main():
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Attach top-song clips (with embedded audio) for the page only.
+    # Attach top-song clips (embedded audio) and pencil sketches for the page.
     augmented = attach_top_clips(data)
+    attach_sketches(augmented)
 
     # Embed the JSON as a JS object literal. json.dumps is valid JS; escape
     # </script> so the payload can't break out of the <script> block.

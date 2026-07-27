@@ -13,10 +13,21 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLIPS_DIR = os.path.join(HERE, "clips")
+SKETCHES_DIR = os.path.join(HERE, "sketches")
 RECORDINGS_DIR = os.path.join(HERE, "recordings")
 
 TOP_N = 3          # number of top songs to keep audio for, per species
 PAD_SEC = 0.5      # extra context padding on each side of the detection window
+
+
+def species_slug(common_name):
+    """Filesystem-safe slug for a species (used for sketch filenames)."""
+    return "".join(c if (c.isalnum() or c in "-_") else "_"
+                   for c in (common_name or "unknown"))
+
+
+def sketch_path(common_name):
+    return os.path.join(SKETCHES_DIR, species_slug(common_name) + ".png")
 
 
 def top_songs(entry, n=TOP_N):
