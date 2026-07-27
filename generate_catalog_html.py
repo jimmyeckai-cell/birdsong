@@ -635,38 +635,53 @@ function mulberry32(a) {
   };
 }
 const SCENE_SEED = 1337;
-const SCENE_ASPECT = 1.5;  // scene is 3:2 (width / height); see .scene CSS
+// Work in scene units where the 3:2 canvas is 150 wide x 100 tall, so x and y
+// distances are directly comparable.
+const SW = 150, SH = 100;
+
+// Approximate half-extents of a bird box in scene units. Cutouts are portrait,
+// so height ~1.35x width; using this stops birds from overlapping vertically.
+function halfExtents(sizePct) {
+  const hw = (sizePct / 100 * SW) / 2;
+  return [hw, hw * 1.35];
+}
 
 function renderScene() {
   const scene = document.getElementById('scene');
   scene.innerHTML = '';
   document.getElementById('kpi-num').textContent = displayedSpecies.length;
   const rand = mulberry32(SCENE_SEED);
-  const placed = [];  // {x, y, r} in width-percent units
+  const placed = [];  // {x, y, hw, hh} in scene units
 
   for (const sp of displayedSpecies) {
-    const size = 11 + rand() * 9;          // bird width as % of scene width
-    const r = size / 2;
-    // Try to find a spot that only slightly overlaps existing birds.
-    let x = 50, y = 50;
-    for (let tries = 0; tries < 40; tries++) {
-      x = 11 + rand() * 78;
-      y = 16 + rand() * 66;
-      const clash = placed.some(p => {
-        const dx = x - p.x, dy = (y - p.y) / SCENE_ASPECT;  // y% -> width-% units
-        return Math.hypot(dx, dy) < 0.82 * (r + p.r);        // 0.82 => slight overlap ok
-      });
-      if (!clash) break;
+    const size = 9 + rand() * 7;                 // bird width as % of scene width
+    const [hw, hh] = halfExtents(size);
+    const mx = hw * 0.6, my = hh * 0.6;          // keep mostly in-frame
+
+    // Best-candidate (blue-noise) sampling: try K spots, keep the one whose
+    // nearest neighbour is farthest -> even, non-grid, minimal overlap.
+    let best = { x: SW / 2, y: SH / 2 }, bestScore = -Infinity;
+    for (let k = 0; k < 60; k++) {
+      const x = mx + rand() * (SW - 2 * mx);
+      const y = my + rand() * (SH - 2 * my);
+      let score = Infinity;
+      for (const p of placed) {
+        // Box clearance: >=1 means the boxes don't overlap on some axis.
+        const clear = Math.max(Math.abs(x - p.x) / (hw + p.hw),
+                               Math.abs(y - p.y) / (hh + p.hh));
+        if (clear < score) score = clear;
+      }
+      if (score > bestScore) { bestScore = score; best = { x, y }; }
     }
-    placed.push({ x, y, r });
+    placed.push({ x: best.x, y: best.y, hw, hh });
 
     const bird = document.createElement('div');
     bird.className = 'scene-bird';
-    bird.style.left = x + '%';
-    bird.style.top = y + '%';
+    bird.style.left = (best.x / SW * 100) + '%';
+    bird.style.top = (best.y / SH * 100) + '%';
     bird.style.width = size + '%';
-    bird.style.setProperty('--rot', ((rand() * 2 - 1) * 8).toFixed(1) + 'deg');
-    bird.style.zIndex = Math.round(size);  // bigger birds sit in front
+    bird.style.setProperty('--rot', ((rand() * 2 - 1) * 6).toFixed(1) + 'deg');
+    bird.style.zIndex = Math.round(best.y);      // lower birds sit in front
 
     const img = document.createElement('img');
     if (!sp.art) img.className = 'fallback';
