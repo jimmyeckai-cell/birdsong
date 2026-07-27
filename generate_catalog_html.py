@@ -114,13 +114,18 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 1120px; margin: 0 auto; display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 42px 30px;
   }
-  .art-item { text-align: center; }
+  .art-item { position: relative; text-align: center; }
   .art-item img { width: 100%; height: auto; display: block; }
-  .art-item .art-name {
-    margin-top: 8px; font-size: 0.78rem; font-weight: 400; letter-spacing: 0.14em;
-    text-transform: uppercase; color: #6b7b72;
-  }
   .art-item img.fallback { width: 45%; margin: 0 auto; opacity: .35; }
+  /* Name is hidden until you hover the bird. */
+  .art-item .art-name {
+    position: absolute; left: 0; right: 0; bottom: 6px;
+    font-size: 0.78rem; font-weight: 500; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #34403a;
+    opacity: 0; transition: opacity .18s ease; pointer-events: none;
+    text-shadow: 0 1px 3px rgba(255,255,255,.95), 0 0 8px rgba(255,255,255,.8);
+  }
+  .art-item:hover .art-name { opacity: 1; }
   .explore-bar {
     position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
     padding: 22px; pointer-events: none;
