@@ -1,0 +1,21 @@
+# Bird-identification pipeline dependencies.
+# Reproduce with:  python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
+#
+# birdnetlib bundles the BirdNET tflite model (no API key / model download).
+# It needs a TFLite runtime, which comes from EITHER:
+#   - tensorflow (used here; has arm64 macOS + Linux wheels), OR
+#   - tflite-runtime (smaller; good on aarch64 Linux where a tflite-runtime
+#     wheel exists). See the numpy note below if you use tflite-runtime.
+#
+# NUMPY NOTE: tflite-runtime 2.14.0 was built against numpy 1.x and crashes
+# under numpy 2.x ("AttributeError: _ARRAY_API not found"). If you switch to
+# tflite-runtime, pin `numpy<2` (e.g. numpy==1.26.4). Full tensorflow (below)
+# works with numpy 2.x, which is why we do not pin it on this install.
+
+birdnetlib==0.18.1
+librosa==0.11.0
+tensorflow==2.20.0
+
+# --- Alternative TFLite backend (Linux aarch64 etc.); requires numpy<2 ---
+# tflite-runtime==2.14.0
+# numpy==1.26.4

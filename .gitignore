@@ -1,0 +1,14 @@
+# Python virtual environment
+venv/
+
+# Python bytecode / caches
+__pycache__/
+*.pyc
+*.pyo
+
+# OS cruft
+.DS_Store
+
+# NOTE: bird_catalog_data.json, bird_catalog.html, and recordings/ are
+# intentionally NOT ignored — the catalog data and audio should sync
+# across machines.
