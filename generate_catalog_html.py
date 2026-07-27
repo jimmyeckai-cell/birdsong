@@ -18,6 +18,11 @@ import catalog_clips as cc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# A species is only shown in the catalog if at least one of its songs reaches
+# this confidence. Lower-confidence species stay stored in the JSON (and
+# embedded in the page) but hidden — change this one number to reveal them.
+DISPLAY_MIN_CONF = 0.5
+
 
 def attach_top_clips(data):
     """Return a deep copy of the catalog with each species' top songs (and their
@@ -102,6 +107,9 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 
   /* Landing view — minimal watercolor gallery */
   #view-landing { min-height: 100vh; padding: 54px 24px 130px; }
+  .kpi { text-align: center; margin: 4px auto 44px; }
+  .kpi-num { font-size: 3.2rem; font-weight: 700; color: var(--accent); line-height: 1; }
+  .kpi-label { font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
   .gallery {
     max-width: 1120px; margin: 0 auto; display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 42px 30px;
@@ -215,6 +223,10 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 
 <!-- ============ LANDING VIEW (minimal watercolor gallery) ============ -->
 <section id="view-landing" class="view">
+  <div class="kpi">
+    <div class="kpi-num" id="kpi-num">0</div>
+    <div class="kpi-label">species identified</div>
+  </div>
   <div class="gallery" id="gallery"></div>
   <div class="explore-bar">
     <button id="go-explore" class="explore-btn">Explore database</button>
@@ -272,6 +284,10 @@ const CATALOG = __CATALOG_JSON__;
 const speciesList = Object.values(CATALOG.species || {}).sort(
   (a, b) => a.common_name.localeCompare(b.common_name));
 
+// Only species with a detection at/above this confidence are displayed.
+// Everything is still embedded above, so lowering this reveals the rest.
+const DISPLAY_MIN_CONF = __DISPLAY_MIN_CONF__;
+
 function sessionsOf(sp) { return sp.sessions || []; }
 function songsOf(session) { return session.songs || []; }
 function allSongs(sp) {
@@ -296,6 +312,14 @@ function fmtTime(sec) {
   const s = Math.floor(sec % 60), m = Math.floor(sec / 60);
   return m + ':' + String(s).padStart(2, '0');
 }
+
+function speciesMaxConf(sp) {
+  const s = confStats(allSongs(sp));
+  return s ? s.high : 0;
+}
+// The species actually shown anywhere in the UI (>= DISPLAY_MIN_CONF).
+const displayedSpecies = speciesList.filter(
+  sp => speciesMaxConf(sp) >= DISPLAY_MIN_CONF);
 
 function renderClips(sp) {
   const wrap = document.getElementById('m-clips-wrap');
@@ -339,14 +363,14 @@ function renderClips(sp) {
 
 function computeStats() {
   let sessions = 0, songs = 0; const locs = new Set();
-  for (const sp of speciesList) {
+  for (const sp of displayedSpecies) {
     for (const sess of sessionsOf(sp)) {
       sessions++;
       songs += songsOf(sess).length;
       locs.add(sess.location);
     }
   }
-  document.getElementById('stat-species').textContent = speciesList.length;
+  document.getElementById('stat-species').textContent = displayedSpecies.length;
   document.getElementById('stat-sessions').textContent = sessions;
   document.getElementById('stat-songs').textContent = songs;
   document.getElementById('stat-locations').textContent = locs.size;
@@ -396,7 +420,7 @@ function renderGrid(filter) {
   grid.innerHTML = '';
   const f = (filter || '').trim().toLowerCase();
   let shown = 0;
-  for (const sp of speciesList) {
+  for (const sp of displayedSpecies) {
     const hay = (sp.common_name + ' ' + (sp.scientific_name || '')).toLowerCase();
     if (f && !hay.includes(f)) continue;
     shown++;
@@ -550,7 +574,8 @@ function closeModal() { document.getElementById('overlay').classList.remove('ope
 function renderGallery() {
   const gallery = document.getElementById('gallery');
   gallery.innerHTML = '';
-  for (const sp of speciesList) {
+  document.getElementById('kpi-num').textContent = displayedSpecies.length;
+  for (const sp of displayedSpecies) {
     const item = document.createElement('div');
     item.className = 'art-item';
     const img = document.createElement('img');
@@ -615,7 +640,9 @@ def main():
     # Embed the JSON as a JS object literal. json.dumps is valid JS; escape
     # </script> so the payload can't break out of the <script> block.
     embedded = json.dumps(augmented, ensure_ascii=False).replace("</", "<\\/")
-    html = PAGE_TEMPLATE.replace("__CATALOG_JSON__", embedded)
+    html = (PAGE_TEMPLATE
+            .replace("__CATALOG_JSON__", embedded)
+            .replace("__DISPLAY_MIN_CONF__", repr(DISPLAY_MIN_CONF)))
 
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(html)
