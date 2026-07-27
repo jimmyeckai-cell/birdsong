@@ -55,12 +55,17 @@ catalog data is embedded, so it works opened directly or hosted anywhere).
 - `generate_catalog_html.py` — renders `bird_catalog_data.json` → `bird_catalog.html`.
 - `bird_catalog_data.json` — the persistent catalog (committed, syncs across machines).
 - `bird_catalog.html` — the generated page (committed).
-- `recordings/` — put your raw audio here (committed, so recordings sync too).
+- `recordings/` — put your raw audio here. **Not committed** — field-recorder
+  WAVs are too large for git (~800 MB each; GitHub caps at 100 MB), so audio
+  stays local per machine. The catalog records each recording's filename, so
+  provenance still syncs. If you want the audio on another machine, copy it via
+  cloud storage or an external drive.
 
 ## Syncing across two (or more) machines
 
-The catalog data, generated page, and recordings are all committed to git, so
-GitHub is the single source of truth. To avoid conflicts when switching between
+The catalog data and generated page are committed to git, so GitHub is the
+single source of truth for your results. (Raw audio is not synced — see the
+`recordings/` note above.) To avoid conflicts when switching between
 computers, follow one rule: **pull before you start, save when you finish.**
 
 Two helper scripts make this foolproof:

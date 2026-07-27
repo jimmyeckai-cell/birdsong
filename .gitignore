@@ -9,6 +9,12 @@ __pycache__/
 # OS cruft
 .DS_Store
 
-# NOTE: bird_catalog_data.json, bird_catalog.html, and recordings/ are
-# intentionally NOT ignored — the catalog data and audio should sync
-# across machines.
+# Raw audio recordings are too large to sync via git (field-recorder WAVs run
+# ~800 MB each; GitHub caps files at 100 MB). We keep them local per machine.
+# The catalog (bird_catalog_data.json) records each recording's filename, so
+# provenance still syncs even though the audio does not.
+recordings/*
+!recordings/.gitkeep
+
+# NOTE: bird_catalog_data.json and bird_catalog.html are intentionally NOT
+# ignored — the catalog data and generated page DO sync across machines.
