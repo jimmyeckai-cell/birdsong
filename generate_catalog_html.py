@@ -58,21 +58,35 @@ def attach_top_clips(data):
 ART_EMBED_MAX_W = 560  # px; source images are downscaled to keep the page small
 
 
+def _has_alpha(img):
+    return img.mode in ("RGBA", "LA") or (img.mode == "P"
+                                          and "transparency" in img.info)
+
+
 def _embed_art(path):
-    """Normalize any source image (a hand-made custom_art/ file or the auto
-    watercolor) to a modestly-sized JPEG on white and return a base64 data URI.
-    Falls back to embedding the raw bytes if Pillow processing fails."""
+    """Return a base64 data URI for a source image, downscaled to keep the page
+    small. Transparent cutouts are trimmed to the bird and kept as WebP with
+    alpha; opaque images are flattened/encoded as JPEG. Falls back to raw bytes
+    if Pillow processing fails."""
     try:
         import io
         from PIL import Image
         img = Image.open(path)
-        if img.mode in ("RGBA", "LA", "P"):
+        if _has_alpha(img):
             img = img.convert("RGBA")
-            bg = Image.new("RGB", img.size, (255, 255, 255))
-            bg.paste(img, mask=img.split()[-1])  # flatten transparency onto white
-            img = bg
-        else:
-            img = img.convert("RGB")
+            bbox = img.split()[-1].getbbox()  # crop away transparent margins
+            if bbox:
+                img = img.crop(bbox)
+            w, h = img.size
+            if w > ART_EMBED_MAX_W:
+                img = img.resize((ART_EMBED_MAX_W,
+                                  max(1, int(h * ART_EMBED_MAX_W / w))))
+            buf = io.BytesIO()
+            img.save(buf, format="WEBP", quality=90, method=6)  # alpha-preserving
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            return "data:image/webp;base64," + b64
+        # Opaque: flatten onto white and encode JPEG.
+        img = img.convert("RGB")
         w, h = img.size
         if w > ART_EMBED_MAX_W:
             img = img.resize((ART_EMBED_MAX_W, max(1, int(h * ART_EMBED_MAX_W / w))))
@@ -138,22 +152,33 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   .kpi { text-align: center; margin: 4px auto 44px; }
   .kpi-num { font-size: 3.2rem; font-weight: 700; color: var(--accent); line-height: 1; }
   .kpi-label { font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
-  .gallery {
-    max-width: 1120px; margin: 0 auto; display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 42px 30px;
+  /* Free-placement scene (Where's-Waldo style scatter) */
+  .scene {
+    position: relative; width: 100%; max-width: 1200px; margin: 0 auto;
+    aspect-ratio: 3 / 2;
   }
-  .art-item { position: relative; text-align: center; }
-  .art-item img { width: 100%; height: auto; display: block; }
-  .art-item img.fallback { width: 45%; margin: 0 auto; opacity: .35; }
+  .scene-bird {
+    position: absolute; transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
+    cursor: pointer; will-change: transform;
+  }
+  .scene-bird img {
+    display: block; width: 100%; height: auto;
+    filter: drop-shadow(0 3px 5px rgba(0,0,0,.14));
+    transition: transform .15s ease;
+  }
+  .scene-bird img.fallback { opacity: .35; }
+  .scene-bird:hover { z-index: 999 !important; }
+  .scene-bird:hover img { transform: scale(1.07); }
+  .scene-bird.playing img { filter: drop-shadow(0 0 0 2px var(--accent)) drop-shadow(0 3px 5px rgba(0,0,0,.14)); }
   /* Name is hidden until you hover the bird. */
-  .art-item .art-name {
-    position: absolute; left: 0; right: 0; bottom: 6px;
-    font-size: 0.78rem; font-weight: 500; letter-spacing: 0.12em;
-    text-transform: uppercase; color: #34403a;
-    opacity: 0; transition: opacity .18s ease; pointer-events: none;
-    text-shadow: 0 1px 3px rgba(255,255,255,.95), 0 0 8px rgba(255,255,255,.8);
+  .scene-bird .scene-name {
+    position: absolute; left: 50%; bottom: -18px; transform: translateX(-50%);
+    white-space: nowrap; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #34403a; opacity: 0; pointer-events: none;
+    transition: opacity .15s ease;
+    text-shadow: 0 1px 3px rgba(255,255,255,.95), 0 0 8px rgba(255,255,255,.9);
   }
-  .art-item:hover .art-name { opacity: 1; }
+  .scene-bird:hover .scene-name { opacity: 1; }
   .explore-bar {
     position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
     padding: 22px; pointer-events: none;
@@ -254,7 +279,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <div class="kpi-num" id="kpi-num">0</div>
     <div class="kpi-label">species identified</div>
   </div>
-  <div class="gallery" id="gallery"></div>
+  <div class="scene" id="scene"></div>
   <div class="explore-bar">
     <button id="go-explore" class="explore-btn">Explore database</button>
   </div>
@@ -599,25 +624,64 @@ function fetchWiki(name, container) {
 
 function closeModal() { document.getElementById('overlay').classList.remove('open'); }
 
-// ---- Landing gallery (minimal watercolor portraits) ----
-function renderGallery() {
-  const gallery = document.getElementById('gallery');
-  gallery.innerHTML = '';
+// ---- Landing scene: free-placement scatter (Where's-Waldo style) ----
+// Small seeded PRNG so the layout is the same every load/rebuild.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const SCENE_SEED = 1337;
+const SCENE_ASPECT = 1.5;  // scene is 3:2 (width / height); see .scene CSS
+
+function renderScene() {
+  const scene = document.getElementById('scene');
+  scene.innerHTML = '';
   document.getElementById('kpi-num').textContent = displayedSpecies.length;
+  const rand = mulberry32(SCENE_SEED);
+  const placed = [];  // {x, y, r} in width-percent units
+
   for (const sp of displayedSpecies) {
-    const item = document.createElement('div');
-    item.className = 'art-item';
+    const size = 11 + rand() * 9;          // bird width as % of scene width
+    const r = size / 2;
+    // Try to find a spot that only slightly overlaps existing birds.
+    let x = 50, y = 50;
+    for (let tries = 0; tries < 40; tries++) {
+      x = 11 + rand() * 78;
+      y = 16 + rand() * 66;
+      const clash = placed.some(p => {
+        const dx = x - p.x, dy = (y - p.y) / SCENE_ASPECT;  // y% -> width-% units
+        return Math.hypot(dx, dy) < 0.82 * (r + p.r);        // 0.82 => slight overlap ok
+      });
+      if (!clash) break;
+    }
+    placed.push({ x, y, r });
+
+    const bird = document.createElement('div');
+    bird.className = 'scene-bird';
+    bird.style.left = x + '%';
+    bird.style.top = y + '%';
+    bird.style.width = size + '%';
+    bird.style.setProperty('--rot', ((rand() * 2 - 1) * 8).toFixed(1) + 'deg');
+    bird.style.zIndex = Math.round(size);  // bigger birds sit in front
+
     const img = document.createElement('img');
     if (!sp.art) img.className = 'fallback';
     img.src = sp.art || FALLBACK_SKETCH;
     img.alt = sp.common_name;
     img.loading = 'lazy';
+
     const name = document.createElement('div');
-    name.className = 'art-name';
+    name.className = 'scene-name';
     name.textContent = sp.common_name;
-    item.appendChild(img);
-    item.appendChild(name);
-    gallery.appendChild(item);
+
+    bird.appendChild(img);
+    bird.appendChild(name);
+    bird.addEventListener('click', () => playTopSong(sp, bird));
+    scene.appendChild(bird);
   }
 }
 
@@ -646,7 +710,7 @@ document.getElementById('search').addEventListener('input', e => renderGrid(e.ta
 document.getElementById('go-explore').addEventListener('click', showExplore);
 document.getElementById('go-mural').addEventListener('click', showLanding);
 
-renderGallery();
+renderScene();
 </script>
 </body>
 </html>

@@ -30,21 +30,37 @@ from fetch_watercolors import wikipedia_image_url, UA
 
 MODEL = "gpt-image-1"
 
-EDIT_PROMPT = (
-    "Repaint this bird as a delicate watercolor painting of a {name}. "
-    "Loose, soft watercolor washes with visible paper texture and gentle pigment "
-    "bleeds; no hard outlines, no ink lines, no photo realism. Keep the bird's real "
-    "colours and markings. A single bird, centered, natural pose. Plain white "
-    "background with the edges of the painting softly feathering into the white "
-    "— no frame, no border, no drop shadow, no text or signature."
-)
-GEN_PROMPT = (
-    "A delicate watercolor painting of a {name}. Loose, soft watercolor washes with "
-    "visible paper texture and gentle pigment bleeds; no hard outlines, no ink lines. "
-    "A single bird, centered, natural pose, accurate plumage colours. Plain white "
-    "background with the edges softly feathering into the white — no frame, no "
-    "border, no drop shadow, no text or signature. Roughly square composition."
-)
+# Per-style description of the {name} subject. Prompts are assembled from these
+# plus a background clause (transparent cutout vs white paper).
+STYLE_DESC = {
+    "field-guide": (
+        "a naturalistic vintage field-guide illustration of a {name}, in the style "
+        "of a classic Audubon / Sibley bird plate: fine detailed brushwork, accurate "
+        "plumage and markings, natural colours, a painted look with clean crisp edges"),
+    "storybook": (
+        "a painted storybook illustration of a {name}: warm, charming, slightly "
+        "stylized, confident clean edges, rich but friendly colours"),
+    "watercolor": (
+        "a delicate watercolor painting of a {name}: loose soft washes, visible paper "
+        "texture, gentle pigment bleeds, no hard outlines"),
+    "flat": (
+        "a bold flat vector illustration of a {name}: simple clean shapes, minimal "
+        "shading, graphic and playful"),
+}
+
+TRANSPARENT_BG = ("The bird is fully isolated with no background, no scenery, no "
+                  "perch, no shadow — a single bird cut out cleanly. ")
+WHITE_BG = ("Plain white background with the edges softly feathering into the white, "
+            "no frame, no border, no shadow. ")
+
+
+def build_prompt(style, name, transparent, edit):
+    desc = STYLE_DESC[style].format(name=name)
+    bg = TRANSPARENT_BG if transparent else WHITE_BG
+    lead = ("Repaint this bird as " + desc + ". Keep the bird's real colours and "
+            "markings. ") if edit else (desc[0].upper() + desc[1:] + ". ")
+    return (lead + "A single bird, natural pose. " + bg +
+            "No text, no labels, no signature, no border.")
 
 
 def max_conf(entry):
@@ -99,6 +115,10 @@ def main(argv=None):
                    help="Regenerate even species that already have custom art.")
     p.add_argument("--quality", choices=["low", "medium", "high"], default="medium")
     p.add_argument("--size", default="1024x1024")
+    p.add_argument("--style", choices=sorted(STYLE_DESC), default="field-guide",
+                   help="Art style (default: field-guide).")
+    p.add_argument("--transparent", action="store_true",
+                   help="Generate cutouts with a transparent background (PNG).")
     p.add_argument("--text-only", action="store_true",
                    help="Skip the reference photo; generate from text alone.")
     p.add_argument("--limit", type=int, default=None,
@@ -118,7 +138,9 @@ def main(argv=None):
         return 0
 
     approx = {"low": 0.02, "medium": 0.04, "high": 0.17}[args.quality]
-    print(f"Model: {MODEL} | quality: {args.quality} | size: {args.size}")
+    print(f"Model: {MODEL} | style: {args.style} | "
+          f"{'transparent' if args.transparent else 'white bg'} | "
+          f"quality: {args.quality} | size: {args.size}")
     print(f"{len(todo)} image(s) to generate "
           f"(~${approx * len(todo):.2f} at ~${approx:.2f}/image):")
     for name, _ in todo:
@@ -137,6 +159,10 @@ def main(argv=None):
     client = OpenAI()
     os.makedirs(cc.CUSTOM_ART_DIR, exist_ok=True)
 
+    extra = {}
+    if args.transparent:
+        extra = {"background": "transparent", "output_format": "png"}
+
     made = failed = 0
     for name, entry in todo:
         label = species_label(entry)
@@ -145,13 +171,15 @@ def main(argv=None):
             ref = None if args.text_only else download_reference(name, requests)
             if ref is not None:
                 resp = client.images.edit(
-                    model=MODEL, image=ref, size=args.size,
-                    quality=args.quality, prompt=EDIT_PROMPT.format(name=label))
+                    model=MODEL, image=ref, size=args.size, quality=args.quality,
+                    prompt=build_prompt(args.style, label, args.transparent, True),
+                    **extra)
                 mode = "from photo"
             else:
                 resp = client.images.generate(
                     model=MODEL, size=args.size, quality=args.quality,
-                    prompt=GEN_PROMPT.format(name=label))
+                    prompt=build_prompt(args.style, label, args.transparent, False),
+                    **extra)
                 mode = "text-only"
             b64 = resp.data[0].b64_json
             with open(out_path, "wb") as f:
