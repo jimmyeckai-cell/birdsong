@@ -232,10 +232,19 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   .chart .area { fill: var(--accent); opacity: .12; }
   .chart .line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
   .chart .dot { fill: var(--accent); }
-  .region-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
+  .stat-card.wide { max-width: 1120px; }
+  .region-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; align-items: start; }
+  @media (max-width: 680px) { .region-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .region-card { text-align: center; }
   .region-card .rname { font-weight: 600; }
   .region-card .rcount { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .sp-list { text-align: left; margin-top: 14px; }
+  .sp-row { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; padding: 2px 0; }
+  .sp-icon { width: 14px; height: 14px; flex: 0 0 auto; }
+  .sp-name { line-height: 1.25; }
+  .sp-divider { height: 1px; background: var(--border); margin: 9px 0; }
+  .sp-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; font-size: 0.78rem; color: var(--muted); }
+  .sp-legend span { display: inline-flex; align-items: center; gap: 5px; }
   .gauge { width: 100%; max-width: 200px; margin: 4px auto 0; display: block; }
   .gauge .g-bg { fill: none; stroke: var(--border); stroke-width: 14; stroke-linecap: round; }
   .gauge .g-val { fill: none; stroke: var(--accent); stroke-width: 14; stroke-linecap: round; }
@@ -372,9 +381,10 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
       <h3>Species over time</h3>
       <div id="chart-timeline" class="chart"></div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card wide">
       <h3>Coverage by region</h3>
-      <p class="card-note">Species captured vs. an approximate species total per US region.</p>
+      <p class="card-note">Every species in your catalog, per region. Icon = best confidence recorded in that region.</p>
+      <div class="sp-legend" id="sp-legend"></div>
       <div class="region-grid" id="region-grid"></div>
     </div>
   </main>
@@ -803,21 +813,42 @@ function regionOfState(st) {
   }
   return null;
 }
-function regionCoverage() {
-  const captured = {};
-  for (const name in REGIONS) captured[name] = new Set();
-  for (const sp of displayedSpecies) {
-    const regs = new Set();
-    for (const sess of sessionsOf(sp)) {
-      const reg = regionOfState(stateOf(sess.location));
-      if (reg) regs.add(reg);
+// Best confidence (0-1) at which a species was detected in a region, or null.
+function bestConfInRegion(sp, regionName) {
+  let best = null;
+  for (const sess of sessionsOf(sp)) {
+    if (regionOfState(stateOf(sess.location)) !== regionName) continue;
+    for (const g of songsOf(sess)) {
+      const c = g.confidence || 0;
+      if (best === null || c > best) best = c;
     }
-    regs.forEach(reg => captured[reg].add(sp.common_name));
   }
-  return Object.keys(REGIONS).map(name => {
-    const c = captured[name].size, total = REGIONS[name].species_total || 0;
-    return { name, captured: c, total, pct: total ? Math.min(100, c / total * 100) : 0 };
-  });
+  return best;
+}
+function confStatus(best) {
+  if (best === null) return 'none';   // not identified in this region
+  if (best < 0.5) return 'low';       // under 50%
+  if (best < 0.85) return 'mid';      // 50-85%
+  return 'high';                      // over 85%
+}
+function statusIcon(status) {
+  if (status === 'none')
+    return '<svg class="sp-icon" viewBox="0 0 16 16"><path d="M4 4L12 12M12 4L4 12" ' +
+      'stroke="#d64545" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>';
+  if (status === 'low')
+    return '<svg class="sp-icon" viewBox="0 0 16 16"><rect x="2" y="6.3" width="12" ' +
+      'height="3.4" rx="1.7" fill="#e2b53c"/></svg>';
+  const col = status === 'high' ? '#1e7d38' : '#5cc46a';
+  return '<svg class="sp-icon" viewBox="0 0 16 16"><path d="M3.4 8.6L6.6 11.8L12.6 4.4" ' +
+    'stroke="' + col + '" stroke-width="2.4" fill="none" stroke-linecap="round" ' +
+    'stroke-linejoin="round"/></svg>';
+}
+function spRow(name, status) {
+  const row = document.createElement('div');
+  row.className = 'sp-row';
+  row.innerHTML = statusIcon(status) + '<span class="sp-name"></span>';
+  row.querySelector('.sp-name').textContent = name;
+  return row;
 }
 function timelineData() {
   // Count each species at the date it was first confirmed, then accumulate.
@@ -884,14 +915,46 @@ function gaugeSVG(pct) {
 }
 function renderStats() {
   document.getElementById('chart-timeline').innerHTML = lineChartSVG(timelineData());
+
+  document.getElementById('sp-legend').innerHTML =
+    '<span>' + statusIcon('none') + 'not identified</span>' +
+    '<span>' + statusIcon('low') + 'under 50%</span>' +
+    '<span>' + statusIcon('mid') + '50–85%</span>' +
+    '<span>' + statusIcon('high') + 'over 85%</span>';
+
+  const allSpecies = speciesList.slice()
+    .sort((a, b) => a.common_name.localeCompare(b.common_name));
   const grid = document.getElementById('region-grid');
   grid.innerHTML = '';
-  for (const r of regionCoverage()) {
+
+  for (const rname of Object.keys(REGIONS)) {
+    const total = REGIONS[rname].species_total || 0;
+    const none = [], ided = [];
+    for (const sp of allSpecies) {
+      const status = confStatus(bestConfInRegion(sp, rname));
+      (status === 'none' ? none : ided).push({ name: sp.common_name, status });
+    }
+    const captured = ided.length;
+    const pct = total ? Math.min(100, captured / total * 100) : 0;
+
     const card = document.createElement('div');
     card.className = 'region-card';
-    card.innerHTML = '<div class="rname"></div>' + gaugeSVG(r.pct) + '<div class="rcount"></div>';
-    card.querySelector('.rname').textContent = r.name;
-    card.querySelector('.rcount').textContent = r.captured + ' / ' + r.total + ' species';
+    const head = document.createElement('div');
+    head.innerHTML = '<div class="rname"></div>' + gaugeSVG(pct) + '<div class="rcount"></div>';
+    head.querySelector('.rname').textContent = rname;
+    head.querySelector('.rcount').textContent = captured + ' / ' + total + ' species';
+    card.appendChild(head);
+
+    const list = document.createElement('div');
+    list.className = 'sp-list';
+    none.forEach(s => list.appendChild(spRow(s.name, s.status)));   // not-identified first
+    if (none.length && ided.length) {
+      const div = document.createElement('div');
+      div.className = 'sp-divider';
+      list.appendChild(div);
+    }
+    ided.forEach(s => list.appendChild(spRow(s.name, s.status)));   // then identified
+    card.appendChild(list);
     grid.appendChild(card);
   }
 }
