@@ -36,6 +36,13 @@ def art_path(common_name):
 CUSTOM_ART_DIR = os.path.join(HERE, "custom_art")
 ART_EXTS = (".png", ".jpg", ".jpeg", ".webp")
 
+# Mel-spectrogram images of top songs, keyed by clip id (same id as clips/).
+SPECTRO_DIR = os.path.join(HERE, "spectrograms")
+
+
+def spectrogram_path(cid):
+    return os.path.join(SPECTRO_DIR, cid + ".webp")
+
 
 def custom_art_path(common_name):
     """Return the hand-made image for a species in custom_art/, or None."""

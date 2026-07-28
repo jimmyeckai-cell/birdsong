@@ -14,6 +14,8 @@ PY=./venv/bin/python
 #    page so bird_catalog.html matches the JSON.
 echo "Extracting top-song clips..."
 "$PY" extract_clips.py
+echo "Building spectrograms..."
+"$PY" build_spectrograms.py
 echo "Rendering bird watercolors (uses cache when offline)..."
 "$PY" fetch_watercolors.py || echo "  (watercolor render skipped/failed — cached art still used)"
 echo "Regenerating bird_catalog.html..."

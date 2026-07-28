@@ -131,6 +131,9 @@ def main():
     print("\nExtracting top-song clips...")
     import extract_clips
     extract_clips.main()
+    print("Building spectrograms...")
+    import build_spectrograms
+    build_spectrograms.main([])
     print("Rebuilding bird_catalog.html...")
     subprocess.run([sys.executable, os.path.join(HERE, "generate_catalog_html.py")],
                    check=True)

@@ -117,6 +117,26 @@ def attach_art(data):
         entry["art"] = _embed_art(path) if path else None
     return data
 
+
+def attach_spectrograms(data):
+    """Embed each species' #1 top-song spectrogram (spectrograms/<clip>.webp) as
+    a base64 data URI on the entry as `spectrogram` (None if not built)."""
+    for entry in data.get("species", {}).values():
+        entry["spectrogram"] = None
+        tops = cc.top_songs(entry)
+        if not tops:
+            continue
+        top = tops[0]
+        start, end = top.get("start_time_sec"), top.get("end_time_sec")
+        if start is None or end is None:
+            continue
+        path = cc.spectrogram_path(cc.clip_id(top["recording_file"], start, end))
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            entry["spectrogram"] = "data:image/webp;base64," + b64
+    return data
+
 PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -307,6 +327,9 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   .modal .sci { font-style: italic; color: var(--muted); margin: 0 0 10px; }
   .modal .summary { margin: 0 0 16px; font-size: 0.9rem; color: var(--text); }
   .modal .summary b { color: var(--accent); }
+  .spectro { margin: 0 0 18px; }
+  .spectro img { width: 100%; border-radius: 10px; display: block; background: #000; }
+  .spectro .cap { font-size: 0.72rem; color: var(--muted); margin-top: 5px; letter-spacing: 0.04em; }
   #m-clips-wrap { margin-bottom: 20px; }
   .clip { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   .clip:last-child { border-bottom: none; }
@@ -399,6 +422,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <h2 id="m-name"></h2>
     <p class="sci" id="m-sci"></p>
     <p class="summary" id="m-summary"></p>
+    <div class="spectro" id="m-spectro"></div>
     <div class="wiki" id="m-wiki"></div>
     <div id="m-clips-wrap" style="display:none">
       <h3 style="margin:0 0 8px">Top songs</h3>
@@ -663,6 +687,19 @@ function openModal(sp) {
     tbody.appendChild(tr);
   }
 
+  const spec = document.getElementById('m-spectro');
+  if (sp.spectrogram) {
+    spec.style.display = '';
+    const im = document.createElement('img');
+    im.src = sp.spectrogram; im.alt = 'Spectrogram of ' + sp.common_name + ' top song';
+    im.loading = 'lazy';
+    const cap = document.createElement('div');
+    cap.className = 'cap'; cap.textContent = 'Spectrogram of the loudest recorded song';
+    spec.innerHTML = ''; spec.appendChild(im); spec.appendChild(cap);
+  } else {
+    spec.style.display = 'none'; spec.innerHTML = '';
+  }
+
   renderClips(sp);
 
   const wiki = document.getElementById('m-wiki');
@@ -838,9 +875,11 @@ function statusIcon(status) {
   if (status === 'low')
     return '<svg class="sp-icon" viewBox="0 0 16 16"><rect x="2" y="6.3" width="12" ' +
       'height="3.4" rx="1.7" fill="#e2b53c"/></svg>';
-  const col = status === 'high' ? '#1e7d38' : '#5cc46a';
-  return '<svg class="sp-icon" viewBox="0 0 16 16"><path d="M3.4 8.6L6.6 11.8L12.6 4.4" ' +
-    'stroke="' + col + '" stroke-width="2.4" fill="none" stroke-linecap="round" ' +
+  if (status === 'mid')   // 50-85% -> light-green circle
+    return '<svg class="sp-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.2" ' +
+      'fill="#5cc46a"/></svg>';
+  return '<svg class="sp-icon" viewBox="0 0 16 16"><path d="M3.4 8.6L6.6 11.8L12.6 4.4" ' + // >85% -> dark-green check
+    'stroke="#1e7d38" stroke-width="2.4" fill="none" stroke-linecap="round" ' +
     'stroke-linejoin="round"/></svg>';
 }
 function spRow(name, status) {
@@ -1000,9 +1039,10 @@ def main():
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Attach top-song clips (embedded audio) and watercolor art for the page.
+    # Attach top-song clips (embedded audio), watercolor art, and spectrograms.
     augmented = attach_top_clips(data)
     attach_art(augmented)
+    attach_spectrograms(augmented)
 
     # Embed the JSON as a JS object literal. json.dumps is valid JS; escape
     # </script> so the payload can't break out of the <script> block.
