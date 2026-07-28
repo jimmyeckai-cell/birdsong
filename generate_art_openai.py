@@ -52,8 +52,10 @@ TRANSPARENT_BG = ("The bird is fully isolated with no background, no scenery, no
                   "perch, no shadow — a single bird cut out cleanly. ")
 WHITE_BG = ("Plain white background with the edges softly feathering into the white, "
             "no frame, no border, no shadow. ")
-FRAMING = ("The entire bird is fully visible with a comfortable margin around it, "
-           "not cropped and not touching the edges. ")
+FRAMING = ("Zoom out so the whole bird is small within the frame with generous "
+           "empty space on all sides; the entire bird — including the crest, every "
+           "wingtip, the full tail and the feet — is completely visible, well inside "
+           "the frame, and never cropped or touching any edge. ")
 
 # Per-species action for the scene. Unlisted species use DEFAULT_POSE. Ask to
 # tweak any of these — they only take effect with --poses.

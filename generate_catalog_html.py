@@ -81,6 +81,13 @@ def _embed_art(path):
             if w > ART_EMBED_MAX_W:
                 img = img.resize((ART_EMBED_MAX_W,
                                   max(1, int(h * ART_EMBED_MAX_W / w))))
+            # Add a uniform transparent margin so the bird never visually touches
+            # a tile/scene edge (and any tight-cropped wingtip gets breathing room).
+            pad = max(6, round(0.05 * max(img.size)))
+            padded = Image.new("RGBA", (img.width + 2 * pad, img.height + 2 * pad),
+                               (0, 0, 0, 0))
+            padded.paste(img, (pad, pad))
+            img = padded
             buf = io.BytesIO()
             img.save(buf, format="WEBP", quality=90, method=6)  # alpha-preserving
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
