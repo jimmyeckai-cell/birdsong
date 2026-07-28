@@ -122,7 +122,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bird Song Catalog</title>
+<title>Bird Songs</title>
 <style>
   :root {
     --bg: #ffffff; --panel: #ffffff; --panel2: #f3f6f4;
@@ -145,12 +145,20 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   .stat .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
   .stat .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
   main { max-width: 1120px; margin: 0 auto; padding: 24px 20px 60px; }
-  .search-wrap { margin: 0 auto 26px; max-width: 460px; }
-  #search {
-    width: 100%; padding: 12px 16px; font-size: 1rem; border-radius: 10px;
-    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  /* Subtle search: an icon in the corner that expands into a field. */
+  .search-box { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin: 0 0 20px; }
+  .search-toggle {
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    padding: 6px; display: flex; border-radius: 8px;
   }
-  #search:focus { outline: none; border-color: var(--accent); }
+  .search-toggle:hover { color: var(--accent); }
+  #search {
+    width: 0; padding: 0; opacity: 0; border: none; border-bottom: 1px solid transparent;
+    background: transparent; color: var(--text); font-size: 0.95rem;
+    transition: width .2s ease, opacity .2s ease, padding .2s ease;
+  }
+  .search-box.open #search { width: 220px; opacity: 1; padding: 6px 4px; border-bottom-color: var(--border); }
+  #search:focus { outline: none; border-bottom-color: var(--accent); }
 
   [hidden] { display: none !important; }
 
@@ -297,8 +305,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <!-- ================ EXPLORE VIEW (full catalog) ==================== -->
 <section id="view-explore" class="view" hidden>
   <header>
-    <h1>&#127925; Bird Song Catalog</h1>
-    <p>Hover a bird for details &middot; click it to hear its best song</p>
+    <h1>&#127925; Bird Songs</h1>
     <div class="stats">
       <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
       <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Concerts</div></div>
@@ -307,8 +314,11 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     </div>
   </header>
   <main>
-    <div class="search-wrap">
-      <input id="search" type="search" placeholder="Search species by name..." autocomplete="off">
+    <div class="search-box" id="search-box">
+      <button class="search-toggle" id="search-toggle" aria-label="Search species" title="Search">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+      </button>
+      <input id="search" type="search" placeholder="Search species..." autocomplete="off">
     </div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="empty" style="display:none">No species match your search.</div>
@@ -733,7 +743,20 @@ document.getElementById('overlay').addEventListener('click', e => {
   if (e.target.id === 'overlay') closeModal();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-document.getElementById('search').addEventListener('input', e => renderGrid(e.target.value));
+const searchBox = document.getElementById('search-box');
+const searchInput = document.getElementById('search');
+document.getElementById('search-toggle').addEventListener('click', () => {
+  searchBox.classList.toggle('open');
+  if (searchBox.classList.contains('open')) {
+    searchInput.focus();
+  } else if (searchInput.value) {
+    searchInput.value = ''; renderGrid('');
+  }
+});
+searchInput.addEventListener('input', e => renderGrid(e.target.value));
+searchInput.addEventListener('blur', () => {
+  if (!searchInput.value.trim()) searchBox.classList.remove('open');
+});
 document.getElementById('go-explore').addEventListener('click', showExplore);
 document.getElementById('go-mural').addEventListener('click', showLanding);
 
