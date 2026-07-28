@@ -301,7 +301,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <p>Hover a bird for details &middot; click it to hear its best song</p>
     <div class="stats">
       <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
-      <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Sessions</div></div>
+      <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Concerts</div></div>
       <div class="stat"><div class="num" id="stat-songs">0</div><div class="lbl">Songs</div></div>
       <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
     </div>
@@ -330,7 +330,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
       <h3 style="margin:0 0 8px">Top songs</h3>
       <div id="m-clips"></div>
     </div>
-    <h3 style="margin:0 0 8px">Sessions</h3>
+    <h3 style="margin:0 0 8px">Concerts</h3>
     <div class="table-scroll">
       <table>
         <thead><tr><th>Location</th><th>Date</th><th>Recording</th><th>Songs</th><th>Highest</th><th>Avg</th></tr></thead>
@@ -516,7 +516,7 @@ function renderGrid(filter) {
                               : '(no audio for this species yet)';
     info.innerHTML =
       '<div class="hi-name"></div><div class="hi-sci"></div>' +
-      '<div class="hi-row"><b>' + nSessions + '</b> session' + (nSessions === 1 ? '' : 's') +
+      '<div class="hi-row"><b>' + nSessions + '</b> concert' + (nSessions === 1 ? '' : 's') +
       ' · <b>' + nSongs + '</b> song' + (nSongs === 1 ? '' : 's') + '</div>' +
       '<div class="hi-row">Top confidence <b>' + (stats ? pct(stats.high) : '-') + '</b></div>' +
       '<div class="hi-row hi-loc"></div>' +
@@ -556,7 +556,7 @@ function openModal(sp) {
   const summary = document.getElementById('m-summary');
   if (overall) {
     summary.innerHTML =
-      'Heard in <b>' + sessions.length + '</b> session' +
+      'Heard in <b>' + sessions.length + '</b> concert' +
       (sessions.length === 1 ? '' : 's') + ' · <b>' + nSongs + '</b> song' +
       (nSongs === 1 ? '' : 's') + ' · highest confidence <b>' +
       pct(overall.high) + '</b> · average <b>' + pct(overall.avg) + '</b>';
