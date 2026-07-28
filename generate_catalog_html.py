@@ -413,9 +413,8 @@ function renderClips(sp) {
     const meta = document.createElement('span');
     meta.className = 'clip-meta';
     const conf = c.confidence != null ? pct(c.confidence) : '-';
-    meta.innerHTML = '<b>' + conf + '</b> · ' + fmtTime(c.start_time_sec) +
-      '–' + fmtTime(c.end_time_sec) + ' · ' + (c.location || '') +
-      ' · ' + (c.recording_file || '');
+    meta.innerHTML = '<b>' + conf + '</b> · ' + (c.date || '') +
+      ' · ' + (c.location || '');
     row.appendChild(meta);
 
     if (c.audio) {
