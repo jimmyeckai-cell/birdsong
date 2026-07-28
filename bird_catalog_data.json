@@ -1085,6 +1085,118 @@
               "start_time_sec": 2115.0
             }
           ]
+        },
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.8123,
+              "end_time_sec": 228.0,
+              "start_time_sec": 225.0
+            },
+            {
+              "confidence": 0.4257,
+              "end_time_sec": 231.0,
+              "start_time_sec": 228.0
+            },
+            {
+              "confidence": 0.4517,
+              "end_time_sec": 261.0,
+              "start_time_sec": 258.0
+            },
+            {
+              "confidence": 0.3366,
+              "end_time_sec": 264.0,
+              "start_time_sec": 261.0
+            },
+            {
+              "confidence": 0.1815,
+              "end_time_sec": 561.0,
+              "start_time_sec": 558.0
+            },
+            {
+              "confidence": 0.1958,
+              "end_time_sec": 729.0,
+              "start_time_sec": 726.0
+            },
+            {
+              "confidence": 0.254,
+              "end_time_sec": 750.0,
+              "start_time_sec": 747.0
+            },
+            {
+              "confidence": 0.6195,
+              "end_time_sec": 1194.0,
+              "start_time_sec": 1191.0
+            },
+            {
+              "confidence": 0.2441,
+              "end_time_sec": 1215.0,
+              "start_time_sec": 1212.0
+            },
+            {
+              "confidence": 0.1987,
+              "end_time_sec": 1230.0,
+              "start_time_sec": 1227.0
+            },
+            {
+              "confidence": 0.1649,
+              "end_time_sec": 1239.0,
+              "start_time_sec": 1236.0
+            },
+            {
+              "confidence": 0.4181,
+              "end_time_sec": 1248.0,
+              "start_time_sec": 1245.0
+            },
+            {
+              "confidence": 0.4176,
+              "end_time_sec": 1266.0,
+              "start_time_sec": 1263.0
+            },
+            {
+              "confidence": 0.1679,
+              "end_time_sec": 1269.0,
+              "start_time_sec": 1266.0
+            },
+            {
+              "confidence": 0.1943,
+              "end_time_sec": 1272.0,
+              "start_time_sec": 1269.0
+            },
+            {
+              "confidence": 0.2319,
+              "end_time_sec": 1275.0,
+              "start_time_sec": 1272.0
+            },
+            {
+              "confidence": 0.2288,
+              "end_time_sec": 1278.0,
+              "start_time_sec": 1275.0
+            },
+            {
+              "confidence": 0.6702,
+              "end_time_sec": 1521.0,
+              "start_time_sec": 1518.0
+            },
+            {
+              "confidence": 0.7243,
+              "end_time_sec": 1524.0,
+              "start_time_sec": 1521.0
+            },
+            {
+              "confidence": 0.2524,
+              "end_time_sec": 1650.0,
+              "start_time_sec": 1647.0
+            },
+            {
+              "confidence": 0.1623,
+              "end_time_sec": 1698.0,
+              "start_time_sec": 1695.0
+            }
+          ]
         }
       ]
     },
@@ -1126,6 +1238,42 @@
               "confidence": 0.1549,
               "end_time_sec": 1371.0,
               "start_time_sec": 1368.0
+            }
+          ]
+        }
+      ]
+    },
+    "Barn Swallow": {
+      "common_name": "Barn Swallow",
+      "scientific_name": "Hirundo rustica",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.5142,
+              "end_time_sec": 1071.0,
+              "start_time_sec": 1068.0
+            }
+          ]
+        }
+      ]
+    },
+    "Black-bellied Plover": {
+      "common_name": "Black-bellied Plover",
+      "scientific_name": "Pluvialis squatarola",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.2485,
+              "end_time_sec": 114.0,
+              "start_time_sec": 111.0
             }
           ]
         }
@@ -1384,6 +1532,18 @@
               "start_time_sec": 207.0
             }
           ]
+        },
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.2032,
+              "end_time_sec": 375.0,
+              "start_time_sec": 372.0
+            }
+          ]
         }
       ]
     },
@@ -1400,6 +1560,137 @@
               "confidence": 0.2122,
               "end_time_sec": 123.0,
               "start_time_sec": 120.0
+            }
+          ]
+        },
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.191,
+              "end_time_sec": 192.0,
+              "start_time_sec": 189.0
+            },
+            {
+              "confidence": 0.4638,
+              "end_time_sec": 345.0,
+              "start_time_sec": 342.0
+            }
+          ]
+        }
+      ]
+    },
+    "Mallard": {
+      "common_name": "Mallard",
+      "scientific_name": "Anas platyrhynchos",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.4998,
+              "end_time_sec": 312.0,
+              "start_time_sec": 309.0
+            }
+          ]
+        }
+      ]
+    },
+    "Marsh Wren": {
+      "common_name": "Marsh Wren",
+      "scientific_name": "Cistothorus palustris",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.1878,
+              "end_time_sec": 1524.0,
+              "start_time_sec": 1521.0
+            }
+          ]
+        }
+      ]
+    },
+    "Mourning Dove": {
+      "common_name": "Mourning Dove",
+      "scientific_name": "Zenaida macroura",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.8906,
+              "end_time_sec": 444.0,
+              "start_time_sec": 441.0
+            },
+            {
+              "confidence": 0.382,
+              "end_time_sec": 624.0,
+              "start_time_sec": 621.0
+            },
+            {
+              "confidence": 0.4389,
+              "end_time_sec": 1119.0,
+              "start_time_sec": 1116.0
+            },
+            {
+              "confidence": 0.5909,
+              "end_time_sec": 1125.0,
+              "start_time_sec": 1122.0
+            },
+            {
+              "confidence": 0.5987,
+              "end_time_sec": 1398.0,
+              "start_time_sec": 1395.0
+            },
+            {
+              "confidence": 0.5869,
+              "end_time_sec": 1401.0,
+              "start_time_sec": 1398.0
+            },
+            {
+              "confidence": 0.3729,
+              "end_time_sec": 1413.0,
+              "start_time_sec": 1410.0
+            },
+            {
+              "confidence": 0.3018,
+              "end_time_sec": 1416.0,
+              "start_time_sec": 1413.0
+            },
+            {
+              "confidence": 0.8157,
+              "end_time_sec": 1437.0,
+              "start_time_sec": 1434.0
+            },
+            {
+              "confidence": 0.334,
+              "end_time_sec": 1440.0,
+              "start_time_sec": 1437.0
+            },
+            {
+              "confidence": 0.7468,
+              "end_time_sec": 1473.0,
+              "start_time_sec": 1470.0
+            },
+            {
+              "confidence": 0.3056,
+              "end_time_sec": 1605.0,
+              "start_time_sec": 1602.0
+            },
+            {
+              "confidence": 0.184,
+              "end_time_sec": 1641.0,
+              "start_time_sec": 1638.0
             }
           ]
         }
@@ -1523,6 +1814,24 @@
         }
       ]
     },
+    "Orchard Oriole": {
+      "common_name": "Orchard Oriole",
+      "scientific_name": "Icterus spurius",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.3704,
+              "end_time_sec": 1635.0,
+              "start_time_sec": 1632.0
+            }
+          ]
+        }
+      ]
+    },
     "Osprey": {
       "common_name": "Osprey",
       "scientific_name": "Pandion haliaetus",
@@ -1571,6 +1880,36 @@
               "start_time_sec": 1227.0
             }
           ]
+        },
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.3906,
+              "end_time_sec": 747.0,
+              "start_time_sec": 744.0
+            }
+          ]
+        }
+      ]
+    },
+    "Red-bellied Woodpecker": {
+      "common_name": "Red-bellied Woodpecker",
+      "scientific_name": "Melanerpes carolinus",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.1716,
+              "end_time_sec": 1488.0,
+              "start_time_sec": 1485.0
+            }
+          ]
         }
       ]
     },
@@ -1610,6 +1949,46 @@
               "confidence": 0.1768,
               "end_time_sec": 1896.0,
               "start_time_sec": 1893.0
+            }
+          ]
+        },
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.1752,
+              "end_time_sec": 909.0,
+              "start_time_sec": 906.0
+            },
+            {
+              "confidence": 0.2863,
+              "end_time_sec": 1017.0,
+              "start_time_sec": 1014.0
+            },
+            {
+              "confidence": 0.152,
+              "end_time_sec": 1266.0,
+              "start_time_sec": 1263.0
+            }
+          ]
+        }
+      ]
+    },
+    "Rock Pigeon": {
+      "common_name": "Rock Pigeon",
+      "scientific_name": "Columba livia",
+      "sessions": [
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.2205,
+              "end_time_sec": 909.0,
+              "start_time_sec": 906.0
             }
           ]
         }
@@ -1678,6 +2057,18 @@
               "confidence": 0.2043,
               "end_time_sec": 1929.0,
               "start_time_sec": 1926.0
+            }
+          ]
+        },
+        {
+          "date": "2026-07-27",
+          "location": "Robbinsville NJ",
+          "recording_file": "Robbinsville_NJ_20260727.WAV",
+          "songs": [
+            {
+              "confidence": 0.1581,
+              "end_time_sec": 687.0,
+              "start_time_sec": 684.0
             }
           ]
         }

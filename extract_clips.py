@@ -22,17 +22,18 @@ from analyze_recording import load_catalog, CATALOG_PATH
 
 
 def find_recording(recording_file):
-    """Locate a recording by basename inside recordings/ (case-insensitive)."""
+    """Locate a recording by basename anywhere under recordings/ (including the
+    processed/ subfolder), case-insensitive."""
     if not recording_file:
         return None
     direct = os.path.join(cc.RECORDINGS_DIR, recording_file)
     if os.path.exists(direct):
         return direct
-    if os.path.isdir(cc.RECORDINGS_DIR):
-        want = recording_file.lower()
-        for name in os.listdir(cc.RECORDINGS_DIR):
+    want = recording_file.lower()
+    for root, _dirs, files in os.walk(cc.RECORDINGS_DIR):
+        for name in files:
             if name.lower() == want:
-                return os.path.join(cc.RECORDINGS_DIR, name)
+                return os.path.join(root, name)
     return None
 
 

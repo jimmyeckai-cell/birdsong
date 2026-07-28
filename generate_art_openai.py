@@ -70,6 +70,8 @@ POSES = {
     "House Finch": "perched, seen from the side",
     "American Robin": "standing alert and upright",
     "Northern Cardinal": "perched and singing",
+    "Barn Swallow": "in swift flight with pointed wings swept back and forked tail spread",
+    "Mourning Dove": "perched, seen from the side",
 }
 
 

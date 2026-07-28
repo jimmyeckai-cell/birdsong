@@ -109,6 +109,59 @@ def get_or_create_session(entry, location, date_str, recording_file):
     return sess
 
 
+def build_analyzer():
+    """Load the BirdNET analyzer (slow; reuse it across many files)."""
+    from birdnetlib.analyzer import Analyzer
+    return Analyzer()
+
+
+def analyze_file(analyzer, audio_file, min_conf, lat=None, lon=None, rec_date=None):
+    """Run BirdNET on one file and return its raw detections. lat/lon (with an
+    optional date) restrict the species list by location/season when given."""
+    from birdnetlib import Recording
+    kwargs = {"min_conf": min_conf}
+    if lat is not None and lon is not None:
+        kwargs["lat"] = lat
+        kwargs["lon"] = lon
+        if rec_date is not None:
+            kwargs["date"] = rec_date
+    recording = Recording(analyzer, audio_file, **kwargs)
+    recording.analyze()
+    return recording.detections
+
+
+def merge_detections(catalog, detections, location, date_str, recording_file):
+    """Merge detections into the catalog as songs under the right session.
+    Returns (songs_added, {common_name: [confidences added]})."""
+    species_map = catalog["species"]
+    songs_added = 0
+    per_species_added = {}
+    for det in detections:
+        common = det.get("common_name")
+        scientific = det.get("scientific_name")
+        if not common:
+            continue
+        entry = species_map.setdefault(common, {
+            "common_name": common,
+            "scientific_name": scientific,
+            "sessions": [],
+        })
+        if not entry.get("scientific_name") and scientific:
+            entry["scientific_name"] = scientific
+        session = get_or_create_session(entry, location, date_str, recording_file)
+        song = {
+            "confidence": round(float(det.get("confidence", 0.0)), 4),
+            "start_time_sec": det.get("start_time"),
+            "end_time_sec": det.get("end_time"),
+        }
+        if song_key(song) in {song_key(s) for s in session["songs"]}:
+            continue
+        session["songs"].append(song)
+        songs_added += 1
+        per_species_added.setdefault(common, []).append(song["confidence"])
+    return songs_added, per_species_added
+
+
 def parse_args(argv):
     p = argparse.ArgumentParser(
         description="Detect birds in an audio recording and add to the catalog.")
@@ -144,18 +197,10 @@ def main(argv=None):
     if (args.lat is None) != (args.lon is None):
         sys.exit("Error: --lat and --lon must be provided together.")
 
-    # Import here so --help works even before heavy deps are installed.
-    from birdnetlib import Recording
-    from birdnetlib.analyzer import Analyzer
-
     print("Loading BirdNET analyzer...")
-    analyzer = Analyzer()
+    analyzer = build_analyzer()
 
-    rec_kwargs = {"min_conf": args.min_conf}
     if args.lat is not None and args.lon is not None:
-        rec_kwargs["lat"] = args.lat
-        rec_kwargs["lon"] = args.lon
-        rec_kwargs["date"] = rec_date
         print(f"Restricting species to lat={args.lat}, lon={args.lon}, "
               f"date={date_str}")
     else:
@@ -163,43 +208,14 @@ def main(argv=None):
 
     print(f"Analyzing {args.audio_file} (min confidence "
           f"{args.min_conf:.2f})...")
-    recording = Recording(analyzer, args.audio_file, **rec_kwargs)
-    recording.analyze()
-
-    detections = recording.detections
+    detections = analyze_file(analyzer, args.audio_file, args.min_conf,
+                              args.lat, args.lon, rec_date)
     recording_file = os.path.basename(args.audio_file)
 
     catalog = load_catalog(CATALOG_PATH)
     species_map = catalog["species"]
-
-    songs_added = 0
-    per_species_added = {}   # common_name -> list of confidences added
-    for det in detections:
-        common = det.get("common_name")
-        scientific = det.get("scientific_name")
-        if not common:
-            continue
-        entry = species_map.setdefault(common, {
-            "common_name": common,
-            "scientific_name": scientific,
-            "sessions": [],
-        })
-        if not entry.get("scientific_name") and scientific:
-            entry["scientific_name"] = scientific
-
-        session = get_or_create_session(entry, args.location, date_str,
-                                        recording_file)
-        song = {
-            "confidence": round(float(det.get("confidence", 0.0)), 4),
-            "start_time_sec": det.get("start_time"),
-            "end_time_sec": det.get("end_time"),
-        }
-        existing = {song_key(s) for s in session["songs"]}
-        if song_key(song) in existing:
-            continue
-        session["songs"].append(song)
-        songs_added += 1
-        per_species_added.setdefault(common, []).append(song["confidence"])
+    songs_added, per_species_added = merge_detections(
+        catalog, detections, args.location, date_str, recording_file)
 
     save_catalog(CATALOG_PATH, catalog)
 
