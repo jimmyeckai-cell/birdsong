@@ -52,14 +52,35 @@ TRANSPARENT_BG = ("The bird is fully isolated with no background, no scenery, no
                   "perch, no shadow — a single bird cut out cleanly. ")
 WHITE_BG = ("Plain white background with the edges softly feathering into the white, "
             "no frame, no border, no shadow. ")
+FRAMING = ("The entire bird is fully visible with a comfortable margin around it, "
+           "not cropped and not touching the edges. ")
+
+# Per-species action for the scene. Unlisted species use DEFAULT_POSE. Ask to
+# tweak any of these — they only take effect with --poses.
+DEFAULT_POSE = "in a natural pose"
+POSES = {
+    "Osprey": "diving with talons outstretched and wings swept back",
+    "Blue Jay": "in flight with wings spread, seen from the side",
+    "Eastern Bluebird": "in flight with wings spread",
+    "Scarlet Tanager": "in flight with wings spread",
+    "Dark-eyed Junco": "taking off, wings beginning to open",
+    "Purple Finch": "perched and singing",
+    "House Finch": "perched, seen from the side",
+    "American Robin": "standing alert and upright",
+    "Northern Cardinal": "perched and singing",
+}
 
 
-def build_prompt(style, name, transparent, edit):
+def build_prompt(style, name, pose, transparent, edit):
     desc = STYLE_DESC[style].format(name=name)
+    action = (", " + pose) if pose else ""
     bg = TRANSPARENT_BG if transparent else WHITE_BG
-    lead = ("Repaint this bird as " + desc + ". Keep the bird's real colours and "
-            "markings. ") if edit else (desc[0].upper() + desc[1:] + ". ")
-    return (lead + "A single bird, natural pose. " + bg +
+    if edit:
+        lead = ("Repaint this bird as " + desc + action +
+                ". Keep the bird's real colours and markings. ")
+    else:
+        lead = desc[0].upper() + desc[1:] + action + ". "
+    return (lead + "A single bird. " + bg + FRAMING +
             "No text, no labels, no signature, no border.")
 
 
@@ -119,6 +140,10 @@ def main(argv=None):
                    help="Art style (default: field-guide).")
     p.add_argument("--transparent", action="store_true",
                    help="Generate cutouts with a transparent background (PNG).")
+    p.add_argument("--poses", action="store_true",
+                   help="Give each species an action pose (see POSES). Implies "
+                        "text-only generation so poses aren't constrained by the "
+                        "reference photo.")
     p.add_argument("--text-only", action="store_true",
                    help="Skip the reference photo; generate from text alone.")
     p.add_argument("--limit", type=int, default=None,
@@ -167,20 +192,23 @@ def main(argv=None):
     for name, entry in todo:
         label = species_label(entry)
         out_path = os.path.join(cc.CUSTOM_ART_DIR, cc.species_slug(name) + ".png")
+        pose = POSES.get(name, DEFAULT_POSE) if args.poses else None
+        # Poses need generation freedom, so --poses forces text-only.
+        use_ref = not args.text_only and not args.poses
         try:
-            ref = None if args.text_only else download_reference(name, requests)
+            ref = download_reference(name, requests) if use_ref else None
             if ref is not None:
                 resp = client.images.edit(
                     model=MODEL, image=ref, size=args.size, quality=args.quality,
-                    prompt=build_prompt(args.style, label, args.transparent, True),
+                    prompt=build_prompt(args.style, label, pose, args.transparent, True),
                     **extra)
                 mode = "from photo"
             else:
                 resp = client.images.generate(
                     model=MODEL, size=args.size, quality=args.quality,
-                    prompt=build_prompt(args.style, label, args.transparent, False),
+                    prompt=build_prompt(args.style, label, pose, args.transparent, False),
                     **extra)
-                mode = "text-only"
+                mode = "text-only" + (" + pose" if pose else "")
             b64 = resp.data[0].b64_json
             with open(out_path, "wb") as f:
                 f.write(base64.b64decode(b64))
