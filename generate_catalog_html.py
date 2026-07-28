@@ -300,10 +300,10 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     <h1>&#127925; Bird Song Catalog</h1>
     <p>Hover a bird for details &middot; click it to hear its best song</p>
     <div class="stats">
-      <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
+      <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
       <div class="stat"><div class="num" id="stat-sessions">0</div><div class="lbl">Concerts</div></div>
       <div class="stat"><div class="num" id="stat-songs">0</div><div class="lbl">Songs</div></div>
-      <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
+      <div class="stat"><div class="num" id="stat-species">0</div><div class="lbl">Species</div></div>
     </div>
   </header>
   <main>
