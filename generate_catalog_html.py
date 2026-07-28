@@ -425,16 +425,19 @@ function renderClips(sp) {
 }
 
 function computeStats() {
-  let sessions = 0, songs = 0; const locs = new Set();
+  let songs = 0; const locs = new Set(); const recordings = new Set();
   for (const sp of displayedSpecies) {
     for (const sess of sessionsOf(sp)) {
-      sessions++;
+      // A "session" is one recording; the same recording shows up under many
+      // species, so count DISTINCT recordings, not per-species session objects.
+      recordings.add((sess.recording_file || '') + '|' + (sess.location || '') +
+                     '|' + (sess.date || ''));
       songs += songsOf(sess).length;
       locs.add(sess.location);
     }
   }
   document.getElementById('stat-species').textContent = displayedSpecies.length;
-  document.getElementById('stat-sessions').textContent = sessions;
+  document.getElementById('stat-sessions').textContent = recordings.size;
   document.getElementById('stat-songs').textContent = songs;
   document.getElementById('stat-locations').textContent = locs.size;
 }
