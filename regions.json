@@ -1,0 +1,19 @@
+{
+  "_comment": "US Census regions. species_total is an APPROXIMATE count of bird species that occur in each region — the denominator for the coverage gauge. Tune these freely; move states between regions to change the grouping.",
+  "Northeast": {
+    "states": ["CT", "ME", "MA", "NH", "RI", "VT", "NJ", "NY", "PA"],
+    "species_total": 480
+  },
+  "Midwest": {
+    "states": ["IL", "IN", "MI", "OH", "WI", "IA", "KS", "MN", "MO", "NE", "ND", "SD"],
+    "species_total": 450
+  },
+  "South": {
+    "states": ["DE", "FL", "GA", "MD", "NC", "SC", "VA", "DC", "WV", "AL", "KY", "MS", "TN", "AR", "LA", "OK", "TX"],
+    "species_total": 550
+  },
+  "West": {
+    "states": ["AZ", "CO", "ID", "MT", "NV", "NM", "UT", "WY", "AK", "CA", "HI", "OR", "WA"],
+    "species_total": 700
+  }
+}

@@ -209,6 +209,37 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 
   /* Explore view */
   #view-explore { padding-bottom: 110px; }
+  #view-stats { padding-bottom: 110px; }
+  .corner-link {
+    position: absolute; top: 16px; background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+  }
+  .corner-link.right { right: 16px; }
+  .corner-link.left { left: 16px; }
+  .corner-link:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Stats cards + charts */
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 22px; margin: 0 auto 24px; max-width: 820px;
+  }
+  .stat-card h3 { margin: 0 0 4px; }
+  .stat-card .card-note { margin: 0 0 16px; color: var(--muted); font-size: 0.85rem; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart .axis { stroke: var(--border); stroke-width: 1; }
+  .chart .grid-line { stroke: var(--border); stroke-width: 1; opacity: .5; }
+  .chart .tick { fill: var(--muted); font-size: 11px; }
+  .chart .area { fill: var(--accent); opacity: .12; }
+  .chart .line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+  .chart .dot { fill: var(--accent); }
+  .region-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
+  .region-card { text-align: center; }
+  .region-card .rname { font-weight: 600; }
+  .region-card .rcount { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .gauge { width: 100%; max-width: 200px; margin: 4px auto 0; display: block; }
+  .gauge .g-bg { fill: none; stroke: var(--border); stroke-width: 14; stroke-linecap: round; }
+  .gauge .g-val { fill: none; stroke: var(--accent); stroke-width: 14; stroke-linecap: round; }
+  .gauge .g-pct { fill: var(--text); font-size: 26px; font-weight: 700; }
 
   /* Bird sketch grid */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px; }
@@ -305,6 +336,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <!-- ================ EXPLORE VIEW (full catalog) ==================== -->
 <section id="view-explore" class="view" hidden>
   <header>
+    <button id="go-stats" class="corner-link right">&#128202; Stats</button>
     <h1>&#127925; Bird Songs</h1>
     <div class="stats">
       <div class="stat"><div class="num" id="stat-locations">0</div><div class="lbl">Locations</div></div>
@@ -326,6 +358,28 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <footer>Generated from bird_catalog_data.json &middot; Watercolors &amp; facts from Wikipedia</footer>
   <div class="explore-bar">
     <button id="go-mural" class="explore-btn">Explore mural</button>
+  </div>
+</section>
+
+<!-- ==================== STATS VIEW ==================== -->
+<section id="view-stats" class="view" hidden>
+  <header>
+    <button id="stats-back" class="corner-link left">&larr; Gallery</button>
+    <h1>&#128202; Stats</h1>
+  </header>
+  <main>
+    <div class="stat-card">
+      <h3>Species over time</h3>
+      <div id="chart-timeline" class="chart"></div>
+    </div>
+    <div class="stat-card">
+      <h3>Coverage by region</h3>
+      <p class="card-note">Species captured vs. an approximate species total per US region.</p>
+      <div class="region-grid" id="region-grid"></div>
+    </div>
+  </main>
+  <div class="explore-bar">
+    <button id="stats-mural" class="explore-btn">Explore mural</button>
   </div>
 </section>
 
@@ -360,6 +414,7 @@ const speciesList = Object.values(CATALOG.species || {}).sort(
 // Only species with a detection at/above this confidence are displayed.
 // Everything is still embedded above, so lowering this reveals the rest.
 const DISPLAY_MIN_CONF = __DISPLAY_MIN_CONF__;
+const REGIONS = __REGIONS_JSON__;
 
 function sessionsOf(sp) { return sp.sessions || []; }
 function songsOf(session) { return session.songs || []; }
@@ -721,20 +776,124 @@ function renderScene() {
   }
 }
 
-// ---- View switching (landing <-> explore) ----
+// ---- View switching (landing / explore / stats) ----
 let exploreRendered = false;
-function showExplore() {
-  if (!exploreRendered) { computeStats(); renderGrid(''); exploreRendered = true; }
-  document.getElementById('view-landing').hidden = true;
-  document.getElementById('view-explore').hidden = false;
+function showView(id) {
+  ['view-landing', 'view-explore', 'view-stats'].forEach(v => {
+    document.getElementById(v).hidden = (v !== id);
+  });
   window.scrollTo(0, 0);
 }
-function showLanding() {
-  stopCurrent();
-  closeModal();
-  document.getElementById('view-explore').hidden = true;
-  document.getElementById('view-landing').hidden = false;
-  window.scrollTo(0, 0);
+function showExplore() {
+  if (!exploreRendered) { computeStats(); renderGrid(''); exploreRendered = true; }
+  showView('view-explore');
+}
+function showLanding() { stopCurrent(); closeModal(); showView('view-landing'); }
+function showStats() { renderStats(); showView('view-stats'); }
+
+// ---- Stats: species-over-time line chart + per-region coverage gauges ----
+function stateOf(loc) {
+  const m = (loc || '').trim().match(/([A-Z]{2})$/);  // trailing 2-letter code
+  return m ? m[1] : null;
+}
+function regionOfState(st) {
+  if (!st) return null;
+  for (const name in REGIONS) {
+    if ((REGIONS[name].states || []).indexOf(st) !== -1) return name;
+  }
+  return null;
+}
+function regionCoverage() {
+  const captured = {};
+  for (const name in REGIONS) captured[name] = new Set();
+  for (const sp of displayedSpecies) {
+    const regs = new Set();
+    for (const sess of sessionsOf(sp)) {
+      const reg = regionOfState(stateOf(sess.location));
+      if (reg) regs.add(reg);
+    }
+    regs.forEach(reg => captured[reg].add(sp.common_name));
+  }
+  return Object.keys(REGIONS).map(name => {
+    const c = captured[name].size, total = REGIONS[name].species_total || 0;
+    return { name, captured: c, total, pct: total ? Math.min(100, c / total * 100) : 0 };
+  });
+}
+function timelineData() {
+  // Count each species at the date it was first confirmed, then accumulate.
+  const byDate = {};
+  for (const sp of displayedSpecies) {
+    let min = null;
+    for (const sess of sessionsOf(sp)) {
+      if (sess.date && (min === null || sess.date < min)) min = sess.date;
+    }
+    if (min) byDate[min] = (byDate[min] || 0) + 1;
+  }
+  let cum = 0; const pts = [];
+  for (const d of Object.keys(byDate).sort()) { cum += byDate[d]; pts.push({ date: d, count: cum }); }
+  return pts;
+}
+function shortDate(iso) {
+  const p = iso.split('-');
+  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(+p[1]) - 1];
+  return mon + ' ' + (+p[2]) + " '" + p[0].slice(2);
+}
+function lineChartSVG(pts) {
+  if (!pts.length) return '<p class="card-note">No dated detections yet.</p>';
+  const W = 720, H = 260, pl = 42, pr = 18, ptop = 18, pb = 42;
+  const plotW = W - pl - pr, plotH = H - ptop - pb;
+  const xs = pts.map(p => Date.parse(p.date));
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const maxY = Math.max.apply(null, pts.map(p => p.count).concat([1]));
+  const xOf = t => pl + (maxX === minX ? plotW / 2 : (t - minX) / (maxX - minX) * plotW);
+  const yOf = v => ptop + plotH - (v / maxY) * plotH;
+  const pp = pts.map(p => [xOf(Date.parse(p.date)), yOf(p.count)]);
+  const line = pp.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = 'M' + pp[0][0].toFixed(1) + ' ' + (ptop + plotH) + ' ' +
+    pp.map(p => 'L' + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ') +
+    ' L' + pp[pp.length - 1][0].toFixed(1) + ' ' + (ptop + plotH) + ' Z';
+  let yticks = '';
+  const steps = Math.min(maxY, 5);
+  for (let i = 0; i <= steps; i++) {
+    const v = Math.round(maxY * i / steps), y = yOf(v);
+    yticks += '<line class="grid-line" x1="' + pl + '" y1="' + y.toFixed(1) + '" x2="' + (W - pr) +
+      '" y2="' + y.toFixed(1) + '"/><text class="tick" x="' + (pl - 6) + '" y="' + (y + 4).toFixed(1) +
+      '" text-anchor="end">' + v + '</text>';
+  }
+  let xlabels = '';
+  pp.forEach((p, i) => {
+    xlabels += '<text class="tick" x="' + p[0].toFixed(1) + '" y="' + (H - pb + 18) +
+      '" text-anchor="middle">' + shortDate(pts[i].date) + '</text>';
+  });
+  const dots = pp.map(p => '<circle class="dot" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4"/>').join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Species over time">' +
+    yticks + '<path class="area" d="' + area + '"/><path class="line" d="' + line + '"/>' + dots +
+    '<line class="axis" x1="' + pl + '" y1="' + (ptop + plotH) + '" x2="' + (W - pr) + '" y2="' + (ptop + plotH) + '"/>' +
+    xlabels + '</svg>';
+}
+function gaugeSVG(pct) {
+  const W = 200, H = 116, cx = 100, cy = 104, r = 84;
+  const frac = Math.max(0, Math.min(1, pct / 100));
+  const ptOf = f => { const a = Math.PI * (1 - f); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
+  const s = ptOf(0), e = ptOf(1), v = ptOf(frac);
+  const bg = 'M ' + s[0].toFixed(1) + ' ' + s[1].toFixed(1) + ' A ' + r + ' ' + r + ' 0 0 1 ' + e[0].toFixed(1) + ' ' + e[1].toFixed(1);
+  const val = 'M ' + s[0].toFixed(1) + ' ' + s[1].toFixed(1) + ' A ' + r + ' ' + r + ' 0 0 1 ' + v[0].toFixed(1) + ' ' + v[1].toFixed(1);
+  return '<svg class="gauge" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + Math.round(pct) + ' percent">' +
+    '<path class="g-bg" d="' + bg + '"/>' + (frac > 0.004 ? '<path class="g-val" d="' + val + '"/>' : '') +
+    '<text class="g-pct" x="' + cx + '" y="' + (cy - 8) + '" text-anchor="middle">' + Math.round(pct) + '%</text></svg>';
+}
+function renderStats() {
+  document.getElementById('chart-timeline').innerHTML = lineChartSVG(timelineData());
+  const grid = document.getElementById('region-grid');
+  grid.innerHTML = '';
+  for (const r of regionCoverage()) {
+    const card = document.createElement('div');
+    card.className = 'region-card';
+    card.innerHTML = '<div class="rname"></div>' + gaugeSVG(r.pct) + '<div class="rcount"></div>';
+    card.querySelector('.rname').textContent = r.name;
+    card.querySelector('.rcount').textContent = r.captured + ' / ' + r.total + ' species';
+    grid.appendChild(card);
+  }
 }
 
 document.getElementById('close').addEventListener('click', closeModal);
@@ -758,6 +917,9 @@ searchInput.addEventListener('blur', () => {
 });
 document.getElementById('go-explore').addEventListener('click', showExplore);
 document.getElementById('go-mural').addEventListener('click', showLanding);
+document.getElementById('go-stats').addEventListener('click', showStats);
+document.getElementById('stats-back').addEventListener('click', showExplore);
+document.getElementById('stats-mural').addEventListener('click', showLanding);
 
 renderScene();
 </script>
@@ -782,8 +944,18 @@ def main():
     # Embed the JSON as a JS object literal. json.dumps is valid JS; escape
     # </script> so the payload can't break out of the <script> block.
     embedded = json.dumps(augmented, ensure_ascii=False).replace("</", "<\\/")
+
+    regions_path = os.path.join(HERE, "regions.json")
+    regions = {}
+    if os.path.exists(regions_path):
+        with open(regions_path, encoding="utf-8") as f:
+            regions = {k: v for k, v in json.load(f).items()
+                       if not k.startswith("_")}
+    regions_json = json.dumps(regions, ensure_ascii=False).replace("</", "<\\/")
+
     html = (PAGE_TEMPLATE
             .replace("__CATALOG_JSON__", embedded)
+            .replace("__REGIONS_JSON__", regions_json)
             .replace("__DISPLAY_MIN_CONF__", repr(DISPLAY_MIN_CONF)))
 
     with open(args.out, "w", encoding="utf-8") as f:
