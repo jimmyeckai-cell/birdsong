@@ -88,14 +88,16 @@
   .bird { cursor: pointer; text-align: center; }
   .sketch-wrap {
     position: relative; background: #fff; border: 1px solid var(--border);
-    border-radius: 14px; overflow: hidden; aspect-ratio: 1 / 1;
+    border-radius: 14px; overflow: hidden; aspect-ratio: 1 / 1; padding: 14px;
     display: flex; align-items: center; justify-content: center;
     transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
   }
   .bird:hover .sketch-wrap { box-shadow: 0 8px 22px rgba(0,0,0,.10); transform: translateY(-3px); border-color: #cfe0d5; }
   .bird.playing .sketch-wrap { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-  .sketch { max-width: 88%; max-height: 88%; object-fit: contain; }
-  .sketch.fallback { width: 45%; height: 45%; opacity: .35; }
+  /* width+height 100% + object-fit:contain guarantees the WHOLE bird fits,
+     scaling down as needed so portrait birds no longer overflow and clip. */
+  .sketch { width: 100%; height: 100%; object-fit: contain; }
+  .sketch.fallback { width: 45%; height: 45%; object-fit: contain; opacity: .35; }
   .bird-name { margin-top: 10px; font-weight: 600; font-size: 0.95rem; }
   .bird-sci { font-style: italic; color: var(--muted); font-size: 0.8rem; }
 
